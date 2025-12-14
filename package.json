@@ -28,10 +28,6 @@
     "email": "693401+djzrs@user.noreply.gitee.com"
   },
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://gitee.com/maikemaker/node-red-contrib-xiaozhi-mcp.git"
-  },
   "bugs": {
     "url": "https://gitee.com/maikemaker/node-red-contrib-xiaozhi-mcp/issues"
   },
