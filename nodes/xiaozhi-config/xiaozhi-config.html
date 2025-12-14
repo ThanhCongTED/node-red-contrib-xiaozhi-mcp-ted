@@ -1,0 +1,368 @@
+<!-- xiaozhi-config 配置节点HTML界面 -->
+
+<script type="text/javascript">
+  RED.nodes.registerType('xiaozhi-config', {
+    category: 'config',
+    defaults: {
+      name: { value: '', required: true },
+      endpoint: { 
+        value: 'wss://api.xiaozhi.me/mcp/', 
+        required: true,
+        validate: function(v) {
+          return v && (v.startsWith('ws://') || v.startsWith('wss://'));
+        }
+      },
+      serverName: { value: 'NodeRED-Device', required: true },
+      autoReconnect: { value: true },
+      reconnectDelay: { 
+        value: 5000, 
+        required: true,
+        validate: function(v) {
+          const num = parseInt(v);
+          return !isNaN(num) && num >= 1000 && num <= 300000;
+        }
+      },
+      heartbeatInterval: { 
+        value: 30000, 
+        required: true,
+        validate: function(v) {
+          const num = parseInt(v);
+          return !isNaN(num) && num >= 10000 && num <= 600000;
+        }
+      },
+      requestTimeout: {
+        value: 30000,
+        required: true,
+        validate: function(v) {
+          const num = parseInt(v);
+          return !isNaN(num) && num >= 5000 && num <= 120000;
+        }
+      }
+    },
+    credentials: {
+      token: { type: 'password', required: true }
+    },
+    label: function() {
+      return this.name || '小智MCP连接';
+    },
+    oneditprepare: function() {
+      const node = this;
+      
+      // 设置表单验证和提示
+      $('#node-config-input-endpoint').on('input change', function() {
+        const value = $(this).val();
+        const isValid = value && (value.startsWith('ws://') || value.startsWith('wss://'));
+        
+        if (!isValid && value) {
+          $(this).addClass('input-error');
+          $('#endpoint-error').text('请输入有效的WebSocket地址 (ws:// 或 wss://)').show();
+        } else {
+          $(this).removeClass('input-error');
+          $('#endpoint-error').hide();
+        }
+      });
+
+      // 数值输入验证
+      $('#node-config-input-reconnectDelay').on('input change', function() {
+        const value = parseInt($(this).val());
+        if (isNaN(value) || value < 1000 || value > 300000) {
+          $(this).addClass('input-error');
+          $('#reconnect-delay-error').text('重连延迟必须在1000-300000ms之间').show();
+        } else {
+          $(this).removeClass('input-error');
+          $('#reconnect-delay-error').hide();
+        }
+      });
+
+      $('#node-config-input-heartbeatInterval').on('input change', function() {
+        const value = parseInt($(this).val());
+        if (isNaN(value) || value < 10000 || value > 600000) {
+          $(this).addClass('input-error');
+          $('#heartbeat-interval-error').text('心跳间隔必须在10000-600000ms之间').show();
+        } else {
+          $(this).removeClass('input-error');
+          $('#heartbeat-interval-error').hide();
+        }
+      });
+
+      $('#node-config-input-requestTimeout').on('input change', function() {
+        const value = parseInt($(this).val());
+        if (isNaN(value) || value < 5000 || value > 120000) {
+          $(this).addClass('input-error');
+          $('#request-timeout-error').text('请求超时必须在5000-120000ms之间').show();
+        } else {
+          $(this).removeClass('input-error');
+          $('#request-timeout-error').hide();
+        }
+      });
+
+      // 测试连接按钮
+      $('#test-connection-btn').on('click', function() {
+        const btn = $(this);
+        const originalText = btn.text();
+        
+        // 禁用按钮并显示加载状态
+        btn.prop('disabled', true).text('测试中...');
+        $('#test-result').hide();
+
+        // 发送测试请求
+        $.ajax({
+          url: `xiaozhi-config/${node.id}/test`,
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            endpoint: $('#node-config-input-endpoint').val(),
+            token: $('#node-config-input-token').val(),
+            serverName: $('#node-config-input-serverName').val()
+          }),
+          success: function(data) {
+            if (data.success) {
+              $('#test-result')
+                .removeClass('test-error')
+                .addClass('test-success')
+                .html('<i class="fa fa-check"></i> 连接测试成功')
+                .show();
+            } else {
+              $('#test-result')
+                .removeClass('test-success')
+                .addClass('test-error')
+                .html('<i class="fa fa-times"></i> 连接失败: ' + (data.error || '未知错误'))
+                .show();
+            }
+          },
+          error: function(xhr) {
+            let errorMsg = '测试失败';
+            try {
+              const response = JSON.parse(xhr.responseText);
+              errorMsg = response.error || errorMsg;
+            } catch (e) {
+              errorMsg = xhr.statusText || errorMsg;
+            }
+            
+            $('#test-result')
+              .removeClass('test-success')
+              .addClass('test-error')
+              .html('<i class="fa fa-times"></i> ' + errorMsg)
+              .show();
+          },
+          complete: function() {
+            // 恢复按钮状态
+            btn.prop('disabled', false).text(originalText);
+          }
+        });
+      });
+
+      // 展开/收起高级设置
+      $('#advanced-toggle').on('click', function() {
+        $('#advanced-settings').toggle();
+        const icon = $(this).find('i');
+        if (icon.hasClass('fa-chevron-down')) {
+          icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        } else {
+          icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        }
+      });
+
+      // 初始化高级设置状态
+      $('#advanced-settings').hide();
+    },
+
+    oneditsave: function() {
+      // 验证所有必填字段
+      let isValid = true;
+      
+      if (!$('#node-config-input-name').val().trim()) {
+        isValid = false;
+      }
+      
+      if (!$('#node-config-input-endpoint').val().trim()) {
+        isValid = false;
+      }
+      
+      if (!$('#node-config-input-token').val().trim()) {
+        isValid = false;
+      }
+
+      return isValid;
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="xiaozhi-config">
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="fa fa-tag"></i> 连接名称</label>
+    <input type="text" id="node-config-input-name" placeholder="输入连接名称，如：小智连接1">
+  </div>
+
+  <div class="form-row">
+    <label for="node-config-input-endpoint"><i class="fa fa-globe"></i> 服务器地址</label>
+    <input type="text" id="node-config-input-endpoint" placeholder="wss://api.xiaozhi.me/mcp/">
+    <div id="endpoint-error" class="form-tips" style="color: red; display: none;"></div>
+    <div class="form-tips">
+      <strong>提示：</strong>输入小智MCP服务器的WebSocket地址，支持ws://和wss://协议
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-config-input-token"><i class="fa fa-key"></i> 访问令牌</label>
+    <input type="password" id="node-config-input-token" placeholder="输入访问令牌">
+    <div class="form-tips">
+      <strong>提示：</strong>从小智平台获取的访问令牌，用于身份验证
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-config-input-serverName"><i class="fa fa-server"></i> 设备名称</label>
+    <input type="text" id="node-config-input-serverName" placeholder="NodeRED-Device">
+    <div class="form-tips">
+      <strong>提示：</strong>在小智平台中显示的设备名称
+    </div>
+  </div>
+
+  <div class="form-row">
+    <input type="checkbox" id="node-config-input-autoReconnect" style="width: 20px; margin-right: 5px;">
+    <label for="node-config-input-autoReconnect" style="width: auto;">启用自动重连</label>
+    <div class="form-tips">
+      <strong>提示：</strong>网络断开时自动尝试重新连接
+    </div>
+  </div>
+
+  <!-- 高级设置 -->
+  <div class="form-row">
+    <label style="width: auto; cursor: pointer;" id="advanced-toggle">
+      <i class="fa fa-chevron-down"></i> 高级设置
+    </label>
+  </div>
+
+  <div id="advanced-settings">
+    <div class="form-row">
+      <label for="node-config-input-reconnectDelay"><i class="fa fa-clock-o"></i> 重连延迟 (毫秒)</label>
+      <input type="number" id="node-config-input-reconnectDelay" min="1000" max="300000" step="1000">
+      <div id="reconnect-delay-error" class="form-tips" style="color: red; display: none;"></div>
+      <div class="form-tips">
+        <strong>范围：</strong>1000-300000毫秒，建议5000毫秒
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="node-config-input-heartbeatInterval"><i class="fa fa-heartbeat"></i> 心跳间隔 (毫秒)</label>
+      <input type="number" id="node-config-input-heartbeatInterval" min="10000" max="600000" step="5000">
+      <div id="heartbeat-interval-error" class="form-tips" style="color: red; display: none;"></div>
+      <div class="form-tips">
+        <strong>范围：</strong>10000-600000毫秒，建议30000毫秒
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="node-config-input-requestTimeout"><i class="fa fa-hourglass-half"></i> 请求超时 (毫秒)</label>
+      <input type="number" id="node-config-input-requestTimeout" min="5000" max="120000" step="5000">
+      <div id="request-timeout-error" class="form-tips" style="color: red; display: none;"></div>
+      <div class="form-tips">
+        <strong>范围：</strong>5000-120000毫秒，建议30000毫秒
+      </div>
+    </div>
+  </div>
+
+  <!-- 连接测试 -->
+  <div class="form-row">
+    <label></label>
+    <button type="button" id="test-connection-btn" class="red-ui-button">
+      <i class="fa fa-plug"></i> 测试连接
+    </button>
+    <div id="test-result" style="margin-top: 10px; padding: 10px; border-radius: 3px; display: none;"></div>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="xiaozhi-config">
+  <p>配置与小智MCP服务器的连接参数。</p>
+
+  <h3>配置说明</h3>
+  <dl class="message-properties">
+    <dt>连接名称</dt>
+    <dd>用于标识此连接配置的名称，建议使用有意义的名称</dd>
+
+    <dt>服务器地址</dt>
+    <dd>小智MCP服务器的WebSocket地址，支持ws://和wss://协议。通常为：wss://api.xiaozhi.me/mcp/</dd>
+
+    <dt>访问令牌</dt>
+    <dd>从小智平台获取的访问令牌，用于身份验证。请妥善保管此令牌</dd>
+
+    <dt>设备名称</dt>
+    <dd>在小智平台中显示的设备名称，有助于识别设备</dd>
+
+    <dt>自动重连</dt>
+    <dd>启用后，网络断开时会自动尝试重新连接</dd>
+  </dl>
+
+  <h3>高级设置</h3>
+  <dl class="message-properties">
+    <dt>重连延迟</dt>
+    <dd>自动重连的延迟时间（毫秒），建议设置为5000毫秒</dd>
+
+    <dt>心跳间隔</dt>
+    <dd>发送心跳消息的间隔（毫秒），用于保持连接活跃，建议30000毫秒</dd>
+
+    <dt>请求超时</dt>
+    <dd>等待服务器响应的超时时间（毫秒），建议30000毫秒</dd>
+  </dl>
+
+  <h3>使用步骤</h3>
+  <ol>
+    <li>填写连接名称，如"小智连接1"</li>
+    <li>输入小智MCP服务器地址</li>
+    <li>输入从小智平台获取的访问令牌</li>
+    <li>设置设备名称（可选）</li>
+    <li>根据需要调整高级设置</li>
+    <li>点击"测试连接"验证配置是否正确</li>
+    <li>保存配置</li>
+  </ol>
+
+  <h3>故障排除</h3>
+  <ul>
+    <li><strong>连接失败</strong>: 检查服务器地址和网络连接</li>
+    <li><strong>认证失败</strong>: 确认访问令牌是否正确且未过期</li>
+    <li><strong>频繁断开</strong>: 调整心跳间隔和重连延迟</li>
+  </ul>
+</script>
+
+<style>
+  .test-success {
+    background-color: #dff0d8;
+    border: 1px solid #d6e9c6;
+    color: #3c763d;
+  }
+  
+  .test-error {
+    background-color: #f2dede;
+    border: 1px solid #ebccd1;
+    color: #a94442;
+  }
+  
+  .input-error {
+    border-color: #a94442 !important;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 6px #ce8483 !important;
+  }
+  
+  .form-tips {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+  }
+  
+  #advanced-toggle {
+    font-weight: bold;
+    color: #337ab7;
+  }
+  
+  #advanced-toggle:hover {
+    color: #23527c;
+  }
+  
+  #advanced-settings {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 10px;
+  }
+</style>

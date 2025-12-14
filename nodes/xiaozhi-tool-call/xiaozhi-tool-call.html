@@ -1,0 +1,624 @@
+<!--
+xiaozhi-tool-call 工具调用节点
+用于主动调用小智平台或其他设备的工具
+-->
+
+<script type="text/javascript">
+  RED.nodes.registerType('xiaozhi-tool-call', {
+    category: '小智MCP',
+    color: '#98FB98',
+    defaults: {
+      name: { value: '' },
+      xiaozhi: { value: '', type: 'xiaozhi-config', required: true },
+      targetTool: { value: '', required: true },
+      toolArguments: { value: '{}' },
+      argumentsSource: { value: 'configured' },
+      outputMode: { value: 'result' },
+      errorHandling: { value: 'throw' },
+      callTimeout: { value: 30000, validate: RED.validators.number() },
+      retryAttempts: { value: 0, validate: RED.validators.number() },
+      retryDelay: { value: 1000, validate: RED.validators.number() }
+    },
+    inputs: 1,
+    outputs: function() {
+      return this.outputMode === 'split' ? 2 : 1;
+    },
+    outputLabels: function() {
+      if (this.outputMode === 'split') {
+        return ['工具结果', '调用元数据'];
+      }
+      return '工具结果';
+    },
+    inputLabels: '触发调用',
+    icon: 'font-awesome/fa-paper-plane',
+    label: function() {
+      return this.name || (this.targetTool ? `调用 ${this.targetTool}` : '工具调用');
+    },
+    labelStyle: function() {
+      return this.name ? 'node_label_italic' : '';
+    },
+    paletteLabel: '工具调用',
+    oneditprepare: function() {
+      var node = this;
+      
+      // 初始化工具参数编辑器
+      var argsEditor = RED.editor.createEditor({
+        id: 'node-input-toolArguments-editor',
+        mode: 'ace/mode/json',
+        value: node.toolArguments || '{}'
+      });
+
+      // 工具选择器
+      var toolSelect = $('#node-input-targetTool');
+      var refreshToolsBtn = $('#refresh-tools');
+      var testCallBtn = $('#test-call');
+
+      // 刷新可用工具列表
+      var refreshTools = function() {
+        var configNode = $('#node-input-xiaozhi').val();
+        if (!configNode) {
+          toolSelect.empty().append('<option value="">请先选择小智配置节点</option>');
+          return;
+        }
+
+        refreshToolsBtn.prop('disabled', true).text('刷新中...');
+
+        $.ajax({
+          url: 'xiaozhi-tool-call/' + (node.id || 'temp') + '/tools',
+          method: 'GET',
+          data: { config: configNode },
+          success: function(data) {
+            toolSelect.empty();
+            
+            if (data.tools && data.tools.length > 0) {
+              toolSelect.append('<option value="">选择工具...</option>');
+              data.tools.forEach(function(tool) {
+                var selected = tool.name === node.targetTool ? 'selected' : '';
+                toolSelect.append(`<option value="${tool.name}" ${selected}>${tool.name} - ${tool.description}</option>`);
+              });
+            } else {
+              toolSelect.append('<option value="">暂无可用工具</option>');
+            }
+          },
+          error: function() {
+            toolSelect.empty().append('<option value="">无法获取工具列表</option>');
+          },
+          complete: function() {
+            refreshToolsBtn.prop('disabled', false).text('刷新工具');
+          }
+        });
+      };
+
+      // 刷新工具按钮点击事件
+      refreshToolsBtn.on('click', refreshTools);
+
+      // 配置节点变化时刷新工具
+      $('#node-input-xiaozhi').on('change', refreshTools);
+
+      // 参数来源变化处理
+      $('#node-input-argumentsSource').on('change', function() {
+        var source = $(this).val();
+        var argsContainer = $('#args-editor-container');
+        var argsHelp = $('#args-source-help');
+        
+        if (source === 'configured') {
+          argsContainer.show();
+          argsHelp.text('在下方编辑器中配置固定的工具参数');
+        } else {
+          argsContainer.hide();
+          var helpTexts = {
+            'msg': '使用输入消息的payload作为工具参数',
+            'msg.args': '使用输入消息的args属性作为工具参数',
+            'flow': '使用Flow上下文中的toolArguments变量',
+            'global': '使用Global上下文中的toolArguments变量'
+          };
+          argsHelp.text(helpTexts[source] || '');
+        }
+      });
+
+      // 输出模式变化处理
+      $('#node-input-outputMode').on('change', function() {
+        var mode = $(this).val();
+        var helpTexts = {
+          'result': '仅输出工具执行结果',
+          'full': '输出完整的工具响应对象',
+          'split': '分别输出结果和元数据到两个端口'
+        };
+        $('#output-mode-help').text(helpTexts[mode] || '');
+        
+        // 更新输出端口显示
+        if (mode === 'split') {
+          $('.output-labels').show();
+        } else {
+          $('.output-labels').hide();
+        }
+      });
+
+      // 错误处理模式变化
+      $('#node-input-errorHandling').on('change', function() {
+        var mode = $(this).val();
+        var helpTexts = {
+          'throw': '抛出异常，节点显示错误状态',
+          'output': '将错误作为消息输出',
+          'ignore': '忽略错误，不输出任何内容'
+        };
+        $('#error-handling-help').text(helpTexts[mode] || '');
+      });
+
+      // JSON参数验证
+      var validateArgs = function() {
+        try {
+          var args = argsEditor.getValue();
+          JSON.parse(args);
+          $('#args-error').hide();
+          $('#args-valid').show();
+          return true;
+        } catch (e) {
+          $('#args-error').text('JSON格式错误: ' + e.message).show();
+          $('#args-valid').hide();
+          return false;
+        }
+      };
+
+      // 监听参数编辑器变化
+      argsEditor.on('change', function() {
+        setTimeout(validateArgs, 500);
+      });
+
+      // 测试工具调用
+      testCallBtn.on('click', function() {
+        var toolName = toolSelect.val();
+        var args = {};
+
+        if (!toolName) {
+          RED.notify('请选择要测试的工具', 'warn');
+          return;
+        }
+
+        try {
+          args = JSON.parse(argsEditor.getValue());
+        } catch (e) {
+          RED.notify('工具参数JSON格式错误', 'error');
+          return;
+        }
+
+        var button = $(this);
+        button.prop('disabled', true).text('测试中...');
+
+        $.ajax({
+          url: 'xiaozhi-tool-call/' + (node.id || 'temp') + '/test',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ toolName, args }),
+          success: function(data) {
+            if (data.success) {
+              RED.notify('工具调用成功', 'success');
+              console.log('Tool call result:', data.result);
+            } else {
+              RED.notify('工具调用失败: ' + data.error, 'error');
+            }
+          },
+          error: function(xhr) {
+            var errorMsg = xhr.responseJSON ? xhr.responseJSON.error : '测试失败';
+            RED.notify('测试错误: ' + errorMsg, 'error');
+          },
+          complete: function() {
+            button.prop('disabled', false).text('测试调用');
+          }
+        });
+      });
+
+      // 获取统计信息
+      $('#get-stats').on('click', function() {
+        if (node.id) {
+          $.ajax({
+            url: 'xiaozhi-tool-call/' + node.id + '/stats',
+            method: 'GET',
+            success: function(data) {
+              var statsText = [
+                '目标工具: ' + data.targetTool,
+                '总调用次数: ' + data.totalCalls,
+                '成功次数: ' + data.successfulCalls,
+                '失败次数: ' + data.failedCalls,
+                '成功率: ' + data.successRate,
+                '平均响应时间: ' + data.averageResponseTime + 'ms'
+              ];
+              
+              if (data.lastCallAt) {
+                statsText.push('最后调用: ' + new Date(data.lastCallAt).toLocaleString());
+              }
+              
+              if (data.lastError) {
+                statsText.push('最后错误: ' + data.lastError);
+              }
+              
+              RED.notify(statsText.join('\n'), 'success');
+            },
+            error: function() {
+              RED.notify('无法获取统计信息', 'error');
+            }
+          });
+        } else {
+          RED.notify('请先保存节点后再查看统计信息', 'warn');
+        }
+      });
+
+      // 超时时间单位转换
+      $('#timeout-unit').on('change', function() {
+        var unit = $(this).val();
+        var timeoutField = $('#node-input-callTimeout');
+        var currentValue = parseInt(timeoutField.val()) || 30000;
+        
+        switch(unit) {
+          case 'seconds':
+            timeoutField.val(Math.round(currentValue / 1000));
+            break;
+          case 'minutes':
+            timeoutField.val(Math.round(currentValue / 60000));
+            break;
+          default: // milliseconds
+            // 保持原值
+            break;
+        }
+      });
+
+      // 预定义参数模板
+      $('#args-template').on('change', function() {
+        var template = $(this).val();
+        var templates = {
+          'led-on': {
+            pin: 2,
+            state: true
+          },
+          'led-off': {
+            pin: 2,
+            state: false
+          },
+          'sensor-temp': {
+            sensorType: 'temperature',
+            pin: 4
+          },
+          'motor-forward': {
+            motorId: 1,
+            speed: 50,
+            duration: 3000
+          },
+          'system-info': {}
+        };
+
+        if (template && templates[template]) {
+          argsEditor.setValue(JSON.stringify(templates[template], null, 2));
+          validateArgs();
+        }
+      });
+
+      // 初始化
+      setTimeout(function() {
+        $('#node-input-argumentsSource').trigger('change');
+        $('#node-input-outputMode').trigger('change');
+        $('#node-input-errorHandling').trigger('change');
+        validateArgs();
+        refreshTools();
+      }, 100);
+    },
+    oneditsave: function() {
+      // 保存参数编辑器内容
+      var argsEditor = RED.editor.getEditor('node-input-toolArguments-editor');
+      if (argsEditor) {
+        this.toolArguments = argsEditor.getValue();
+      }
+
+      // 转换超时时间单位
+      var unit = $('#timeout-unit').val();
+      var timeout = parseInt($('#node-input-callTimeout').val()) || 30;
+      
+      switch(unit) {
+        case 'seconds':
+          this.callTimeout = timeout * 1000;
+          break;
+        case 'minutes':
+          this.callTimeout = timeout * 60000;
+          break;
+        default: // milliseconds
+          this.callTimeout = timeout;
+          break;
+      }
+    },
+    oneditcancel: function() {
+      // 清理编辑器
+      var argsEditor = RED.editor.getEditor('node-input-toolArguments-editor');
+      if (argsEditor) {
+        argsEditor.destroy();
+      }
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="xiaozhi-tool-call">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> 节点名称</label>
+    <input type="text" id="node-input-name" placeholder="可选的节点名称">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-xiaozhi"><i class="fa fa-plug"></i> 小智配置</label>
+    <input type="text" id="node-input-xiaozhi">
+  </div>
+
+  <hr>
+
+  <div class="form-row">
+    <label for="node-input-targetTool"><i class="fa fa-cog"></i> 目标工具</label>
+    <select id="node-input-targetTool" style="width: 60%;">
+      <option value="">选择工具...</option>
+    </select>
+    <button type="button" id="refresh-tools" class="red-ui-button" style="margin-left: 10px;">
+      <i class="fa fa-refresh"></i> 刷新工具
+    </button>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-argumentsSource"><i class="fa fa-code"></i> 参数来源</label>
+    <select id="node-input-argumentsSource">
+      <option value="configured">配置的参数</option>
+      <option value="msg">msg.payload</option>
+      <option value="msg.args">msg.args</option>
+      <option value="flow">Flow上下文</option>
+      <option value="global">Global上下文</option>
+    </select>
+    <div class="red-ui-help">
+      <p id="args-source-help">在下方编辑器中配置固定的工具参数</p>
+    </div>
+  </div>
+
+  <div id="args-editor-container">
+    <div class="form-row">
+      <label for="args-template">参数模板</label>
+      <select id="args-template">
+        <option value="">选择预定义模板...</option>
+        <option value="led-on">LED开启</option>
+        <option value="led-off">LED关闭</option>
+        <option value="sensor-temp">温度传感器</option>
+        <option value="motor-forward">电机前进</option>
+        <option value="system-info">系统信息</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label for="node-input-toolArguments-editor">工具参数</label>
+      <div style="height: 200px; min-height:150px;" class="node-text-editor" id="node-input-toolArguments-editor"></div>
+      <div id="args-valid" style="display:none; color: green; margin-top: 5px;">
+        <i class="fa fa-check"></i> 参数格式正确
+      </div>
+      <div id="args-error" style="display:none; color: red; margin-top: 5px;">
+        <i class="fa fa-exclamation-triangle"></i> <span></span>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="form-row">
+    <label for="node-input-outputMode"><i class="fa fa-share"></i> 输出模式</label>
+    <select id="node-input-outputMode">
+      <option value="result">仅结果</option>
+      <option value="full">完整响应</option>
+      <option value="split">分离输出</option>
+    </select>
+    <div class="red-ui-help">
+      <p id="output-mode-help">仅输出工具执行结果</p>
+    </div>
+  </div>
+
+  <div class="output-labels" style="display:none;">
+    <div class="red-ui-help">
+      <p><strong>分离输出模式：</strong></p>
+      <ul>
+        <li>输出端口1：工具执行结果</li>
+        <li>输出端口2：调用元数据（响应时间、状态等）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-errorHandling"><i class="fa fa-exclamation-triangle"></i> 错误处理</label>
+    <select id="node-input-errorHandling">
+      <option value="throw">抛出异常</option>
+      <option value="output">输出错误</option>
+      <option value="ignore">忽略错误</option>
+    </select>
+    <div class="red-ui-help">
+      <p id="error-handling-help">抛出异常，节点显示错误状态</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="form-row">
+    <label for="node-input-callTimeout"><i class="fa fa-clock-o"></i> 调用超时</label>
+    <input type="number" id="node-input-callTimeout" style="width: 60px;" min="1" step="1" value="30">
+    <select id="timeout-unit" style="width: 80px; margin-left: 5px;">
+      <option value="milliseconds">毫秒</option>
+      <option value="seconds" selected>秒</option>
+      <option value="minutes">分钟</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-retryAttempts"><i class="fa fa-repeat"></i> 重试次数</label>
+    <input type="number" id="node-input-retryAttempts" style="width: 60px;" min="0" max="10" step="1">
+    <div class="red-ui-help">
+      <p>工具调用失败后的重试次数（0表示不重试）</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-retryDelay"><i class="fa fa-hourglass"></i> 重试延迟</label>
+    <input type="number" id="node-input-retryDelay" style="width: 80px;" min="100" step="100"> 毫秒
+    <div class="red-ui-help">
+      <p>重试之间的等待时间</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <button type="button" id="test-call" class="red-ui-button">
+      <i class="fa fa-play"></i> 测试调用
+    </button>
+    <button type="button" id="get-stats" class="red-ui-button" style="margin-left: 10px;">
+      <i class="fa fa-bar-chart"></i> 查看统计
+    </button>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="xiaozhi-tool-call">
+  <p>xiaozhi-tool-call节点用于主动调用小智平台或其他设备注册的工具，实现设备间的互操作。</p>
+
+  <h3>配置说明</h3>
+  <dl class="message-properties">
+    <dt>小智配置 <span class="property-type">xiaozhi-config</span></dt>
+    <dd>选择已配置的小智MCP连接节点</dd>
+
+    <dt>目标工具 <span class="property-type">string</span></dt>
+    <dd>要调用的工具名称，可从可用工具列表中选择</dd>
+
+    <dt>参数来源 <span class="property-type">string</span></dt>
+    <dd>工具参数的来源：配置的参数、msg.payload、msg.args、Flow上下文或Global上下文</dd>
+
+    <dt>输出模式 <span class="property-type">string</span></dt>
+    <dd>结果输出格式：仅结果、完整响应或分离输出</dd>
+
+    <dt>错误处理 <span class="property-type">string</span></dt>
+    <dd>错误处理方式：抛出异常、输出错误或忽略错误</dd>
+
+    <dt>调用超时 <span class="property-type">number</span></dt>
+    <dd>工具调用的最大等待时间</dd>
+
+    <dt>重试设置 <span class="property-type">number</span></dt>
+    <dd>失败重试的次数和延迟时间</dd>
+  </dl>
+
+  <h3>输入消息</h3>
+  <p>触发工具调用的消息：</p>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">any</span></dt>
+    <dd>当参数来源为"msg.payload"时，作为工具参数</dd>
+
+    <dt>args <span class="property-type">object</span></dt>
+    <dd>当参数来源为"msg.args"时，作为工具参数</dd>
+
+    <dt>tool <span class="property-type">string</span></dt>
+    <dd>可选，动态指定要调用的工具名称</dd>
+  </dl>
+
+  <h3>输出消息</h3>
+  <h4>仅结果模式</h4>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">any</span></dt>
+    <dd>工具执行的结果数据</dd>
+
+    <dt>_toolCall <span class="property-type">object</span></dt>
+    <dd>调用元信息：工具名称、时间戳、成功状态</dd>
+  </dl>
+
+  <h4>完整响应模式</h4>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt>
+    <dd>完整的工具响应对象，包含content和isError字段</dd>
+  </dl>
+
+  <h4>分离输出模式</h4>
+  <p>输出端口1（结果）：</p>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">any</span></dt>
+    <dd>工具执行的结果数据</dd>
+  </dl>
+  
+  <p>输出端口2（元数据）：</p>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt>
+    <dd>调用元数据：工具名称、响应时间、状态等</dd>
+  </dl>
+
+  <h3>使用示例</h3>
+  <p><strong>调用LED控制工具</strong></p>
+  <ol>
+    <li>选择目标工具：<code>led_control</code></li>
+    <li>设置参数来源：<code>配置的参数</code></li>
+    <li>配置工具参数：
+      <pre>{
+  "pin": 2,
+  "state": true
+}</pre>
+    </li>
+    <li>选择输出模式：<code>仅结果</code></li>
+    <li>输入任意消息触发调用</li>
+  </ol>
+
+  <p><strong>动态参数调用</strong></p>
+  <ol>
+    <li>设置参数来源：<code>msg.payload</code></li>
+    <li>输入消息：
+      <pre>{
+  "payload": {
+    "pin": 3,
+    "state": false
+  }
+}</pre>
+    </li>
+    <li>节点会使用payload中的参数调用工具</li>
+  </ol>
+
+  <h3>注意事项</h3>
+  <ul>
+    <li>确保目标工具已在MCP服务器上注册</li>
+    <li>工具参数必须符合目标工具的Schema要求</li>
+    <li>使用分离输出模式可以分别处理结果和状态</li>
+    <li>重试机制可以提高调用的可靠性</li>
+    <li>合理设置超时时间，避免长时间等待</li>
+    <li>错误处理模式会影响流程的执行行为</li>
+  </ul>
+</script>
+
+<style>
+  .red-ui-help {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+  }
+  
+  .red-ui-help h4 {
+    margin: 10px 0 5px 0;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  
+  .red-ui-help pre {
+    background: #f5f5f5;
+    padding: 8px;
+    margin: 5px 0;
+    font-size: 11px;
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+  
+  .red-ui-help ul {
+    margin: 5px 0;
+    padding-left: 20px;
+  }
+  
+  #args-valid {
+    color: #5cb85c;
+  }
+  
+  #args-error {
+    color: #d9534f;
+  }
+
+  .output-labels {
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+</style>

@@ -1,0 +1,557 @@
+<!--
+xiaozhi-tool-register 工具注册节点
+用于向小智MCP服务器注册设备工具
+-->
+
+<script type="text/javascript">
+  RED.nodes.registerType('xiaozhi-tool-register', {
+    category: '小智MCP',
+    color: '#87CEEB',
+    defaults: {
+      name: { value: '' },
+      xiaozhi: { value: '', type: 'xiaozhi-config', required: true },
+      toolName: { value: '', required: true, validate: RED.validators.regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/) },
+      toolDescription: { value: '', required: true },
+      inputSchema: { value: '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}' },
+      outputToFlow: { value: true },
+      enableValidation: { value: true },
+      asyncExecution: { value: false },
+      executionTimeout: { value: 30000, validate: RED.validators.number() }
+    },
+    inputs: 1,
+    outputs: 1,
+    inputLabels: '工具调用响应',
+    outputLabels: '工具调用请求',
+    icon: 'font-awesome/fa-cogs',
+    label: function() {
+      return this.name || this.toolName || '工具注册';
+    },
+    labelStyle: function() {
+      return this.name ? 'node_label_italic' : '';
+    },
+    paletteLabel: '工具注册',
+    oneditprepare: function() {
+      var node = this;
+      
+      // 初始化CodeMirror编辑器用于JSON Schema
+      var schemaEditor = RED.editor.createEditor({
+        id: 'node-input-inputSchema-editor',
+        mode: 'ace/mode/json',
+        value: node.inputSchema || '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}'
+      });
+
+      // 监听工具名称变化，自动生成描述
+      $('#node-input-toolName').on('blur', function() {
+        var toolName = $(this).val();
+        var descriptionField = $('#node-input-toolDescription');
+        
+        if (toolName && !descriptionField.val()) {
+          // 自动生成描述
+          var description = toolName.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').toLowerCase();
+          description = description.charAt(0).toUpperCase() + description.slice(1);
+          descriptionField.val(description + '工具');
+        }
+      });
+
+      // JSON Schema 验证
+      var validateSchema = function() {
+        try {
+          var schema = schemaEditor.getValue();
+          JSON.parse(schema);
+          $('#schema-error').hide();
+          $('#schema-valid').show();
+          return true;
+        } catch (e) {
+          $('#schema-error').text('JSON Schema格式错误: ' + e.message).show();
+          $('#schema-valid').hide();
+          return false;
+        }
+      };
+
+      // 监听Schema编辑器变化
+      schemaEditor.on('change', function() {
+        setTimeout(validateSchema, 500);
+      });
+
+      // 预定义Schema模板
+      $('#schema-template').on('change', function() {
+        var template = $(this).val();
+        var schemas = {
+          'simple-string': {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                description: '字符串值'
+              }
+            },
+            required: ['value']
+          },
+          'simple-number': {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'number',
+                description: '数字值'
+              }
+            },
+            required: ['value']
+          },
+          'led-control': {
+            type: 'object',
+            properties: {
+              pin: {
+                type: 'number',
+                description: 'LED引脚号',
+                minimum: 0,
+                maximum: 40
+              },
+              state: {
+                type: 'boolean',
+                description: 'LED状态 (true=开启, false=关闭)'
+              }
+            },
+            required: ['pin', 'state']
+          },
+          'sensor-read': {
+            type: 'object',
+            properties: {
+              sensorType: {
+                type: 'string',
+                description: '传感器类型',
+                enum: ['temperature', 'humidity', 'pressure', 'light']
+              },
+              pin: {
+                type: 'number',
+                description: '传感器引脚号',
+                minimum: 0,
+                maximum: 40
+              }
+            },
+            required: ['sensorType', 'pin']
+          },
+          'motor-control': {
+            type: 'object',
+            properties: {
+              motorId: {
+                type: 'number',
+                description: '电机ID',
+                minimum: 1,
+                maximum: 4
+              },
+              speed: {
+                type: 'number',
+                description: '电机速度 (-100到100)',
+                minimum: -100,
+                maximum: 100
+              },
+              duration: {
+                type: 'number',
+                description: '运行时间(毫秒)',
+                minimum: 0
+              }
+            },
+            required: ['motorId', 'speed']
+          }
+        };
+
+        if (template && schemas[template]) {
+          schemaEditor.setValue(JSON.stringify(schemas[template], null, 2));
+          validateSchema();
+        }
+      });
+
+      // 初始验证
+      setTimeout(validateSchema, 100);
+
+      // 测试连接按钮
+      $('#test-connection').on('click', function() {
+        var configNode = $('#node-input-xiaozhi').val();
+        if (!configNode) {
+          RED.notify('请先选择小智配置节点', 'warn');
+          return;
+        }
+
+        var button = $(this);
+        button.prop('disabled', true).text('测试中...');
+
+        $.ajax({
+          url: 'xiaozhi-config/' + configNode + '/status',
+          method: 'GET',
+          success: function(data) {
+            if (data.isConnected) {
+              RED.notify('连接正常', 'success');
+            } else {
+              RED.notify('连接异常: ' + (data.lastError || '未连接'), 'warn');
+            }
+          },
+          error: function() {
+            RED.notify('无法获取连接状态', 'error');
+          },
+          complete: function() {
+            button.prop('disabled', false).text('测试连接');
+          }
+        });
+      });
+
+      // 获取统计信息按钮
+      $('#get-stats').on('click', function() {
+        if (node.id) {
+          $.ajax({
+            url: 'xiaozhi-tool-register/' + node.id + '/stats',
+            method: 'GET',
+            success: function(data) {
+              var statsText = [
+                '工具名称: ' + data.toolName,
+                '注册状态: ' + (data.registered ? '已注册' : '未注册'),
+                '调用次数: ' + data.callCount,
+                '平均执行时间: ' + data.averageExecutionTime + 'ms',
+                '待处理调用: ' + data.pendingCalls
+              ];
+              
+              if (data.lastCalledAt) {
+                statsText.push('最后调用: ' + new Date(data.lastCalledAt).toLocaleString());
+              }
+              
+              RED.notify(statsText.join('\n'), 'success');
+            },
+            error: function() {
+              RED.notify('无法获取统计信息', 'error');
+            }
+          });
+        } else {
+          RED.notify('请先保存节点后再查看统计信息', 'warn');
+        }
+      });
+
+      // 超时时间单位转换
+      $('#timeout-unit').on('change', function() {
+        var unit = $(this).val();
+        var timeoutField = $('#node-input-executionTimeout');
+        var currentValue = parseInt(timeoutField.val()) || 30000;
+        
+        switch(unit) {
+          case 'seconds':
+            timeoutField.val(Math.round(currentValue / 1000));
+            break;
+          case 'minutes':
+            timeoutField.val(Math.round(currentValue / 60000));
+            break;
+          default: // milliseconds
+            // 保持原值
+            break;
+        }
+      });
+
+      // 帮助信息切换
+      $('.help-toggle').on('click', function() {
+        var target = $(this).data('target');
+        $(target).toggle();
+      });
+    },
+    oneditsave: function() {
+      // 保存Schema编辑器内容
+      var schemaEditor = RED.editor.getEditor('node-input-inputSchema-editor');
+      if (schemaEditor) {
+        this.inputSchema = schemaEditor.getValue();
+      }
+
+      // 转换超时时间单位
+      var unit = $('#timeout-unit').val();
+      var timeout = parseInt($('#node-input-executionTimeout').val()) || 30;
+      
+      switch(unit) {
+        case 'seconds':
+          this.executionTimeout = timeout * 1000;
+          break;
+        case 'minutes':
+          this.executionTimeout = timeout * 60000;
+          break;
+        default: // milliseconds
+          this.executionTimeout = timeout;
+          break;
+      }
+    },
+    oneditcancel: function() {
+      // 清理编辑器
+      var schemaEditor = RED.editor.getEditor('node-input-inputSchema-editor');
+      if (schemaEditor) {
+        schemaEditor.destroy();
+      }
+    }
+  });
+</script>
+
+<script type="text/html" data-template-name="xiaozhi-tool-register">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> 节点名称</label>
+    <input type="text" id="node-input-name" placeholder="可选的节点名称">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-xiaozhi"><i class="fa fa-plug"></i> 小智配置</label>
+    <input type="text" id="node-input-xiaozhi">
+    <button type="button" id="test-connection" class="red-ui-button" style="margin-left: 10px;">
+      <i class="fa fa-check"></i> 测试连接
+    </button>
+  </div>
+
+  <hr>
+
+  <div class="form-row">
+    <label for="node-input-toolName"><i class="fa fa-cog"></i> 工具名称</label>
+    <input type="text" id="node-input-toolName" placeholder="my_tool">
+    <div class="red-ui-help">
+      <p>工具名称必须唯一，只能包含字母、数字、下划线和连字符，不能以数字开头。</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-toolDescription"><i class="fa fa-info-circle"></i> 工具描述</label>
+    <input type="text" id="node-input-toolDescription" placeholder="描述工具的功能">
+    <div class="red-ui-help">
+      <p>简洁明了地描述工具的功能，将显示在小智AI平台上。</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="schema-template"><i class="fa fa-code"></i> Schema模板</label>
+    <select id="schema-template">
+      <option value="">选择预定义模板...</option>
+      <option value="simple-string">简单字符串参数</option>
+      <option value="simple-number">简单数字参数</option>
+      <option value="led-control">LED控制</option>
+      <option value="sensor-read">传感器读取</option>
+      <option value="motor-control">电机控制</option>
+    </select>
+    <button type="button" class="help-toggle red-ui-button" data-target="#schema-help" style="margin-left: 10px;">
+      <i class="fa fa-question-circle"></i> 帮助
+    </button>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-inputSchema-editor">输入参数Schema</label>
+    <div style="height: 300px; min-height:200px;" class="node-text-editor" id="node-input-inputSchema-editor"></div>
+    <div id="schema-valid" style="display:none; color: green; margin-top: 5px;">
+      <i class="fa fa-check"></i> Schema格式正确
+    </div>
+    <div id="schema-error" style="display:none; color: red; margin-top: 5px;">
+      <i class="fa fa-exclamation-triangle"></i> <span></span>
+    </div>
+  </div>
+
+  <div id="schema-help" class="red-ui-help" style="display:none;">
+    <h4>JSON Schema 说明</h4>
+    <p>JSON Schema用于定义工具接受的参数格式。常用字段：</p>
+    <ul>
+      <li><strong>type</strong>: 数据类型 (object, string, number, boolean, array)</li>
+      <li><strong>properties</strong>: 对象属性定义</li>
+      <li><strong>required</strong>: 必填字段列表</li>
+      <li><strong>description</strong>: 字段描述</li>
+      <li><strong>minimum/maximum</strong>: 数字范围限制</li>
+      <li><strong>enum</strong>: 枚举值列表</li>
+    </ul>
+    <p>示例：控制LED灯的Schema</p>
+    <pre>{
+  "type": "object",
+  "properties": {
+    "pin": {
+      "type": "number",
+      "description": "LED引脚号",
+      "minimum": 0,
+      "maximum": 40
+    },
+    "state": {
+      "type": "boolean",
+      "description": "LED状态"
+    }
+  },
+  "required": ["pin", "state"]
+}</pre>
+  </div>
+
+  <hr>
+
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <input type="checkbox" id="node-input-outputToFlow" style="display:inline-block; width:auto; vertical-align:top;">
+    <label for="node-input-outputToFlow" style="width:70%;">输出到流程处理</label>
+    <div class="red-ui-help">
+      <p>启用后，工具调用会发送到流程进行处理；禁用时返回默认响应。</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <input type="checkbox" id="node-input-enableValidation" style="display:inline-block; width:auto; vertical-align:top;">
+    <label for="node-input-enableValidation" style="width:70%;">启用参数验证</label>
+    <div class="red-ui-help">
+      <p>根据Schema验证输入参数，建议保持启用。</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <input type="checkbox" id="node-input-asyncExecution" style="display:inline-block; width:auto; vertical-align:top;">
+    <label for="node-input-asyncExecution" style="width:70%;">异步执行</label>
+    <div class="red-ui-help">
+      <p>启用异步执行模式，适合耗时较长的工具。</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-executionTimeout"><i class="fa fa-clock-o"></i> 执行超时</label>
+    <input type="number" id="node-input-executionTimeout" style="width: 60px;" min="1" step="1" value="30">
+    <select id="timeout-unit" style="width: 80px; margin-left: 5px;">
+      <option value="milliseconds">毫秒</option>
+      <option value="seconds" selected>秒</option>
+      <option value="minutes">分钟</option>
+    </select>
+    <div class="red-ui-help">
+      <p>工具执行超时时间，超时后返回错误响应。</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <button type="button" id="get-stats" class="red-ui-button">
+      <i class="fa fa-bar-chart"></i> 查看统计
+    </button>
+    <div class="red-ui-help">
+      <p>查看工具的注册状态和调用统计信息。</p>
+    </div>
+  </div>
+</script>
+
+<script type="text/html" data-help-name="xiaozhi-tool-register">
+  <p>xiaozhi-tool-register节点用于向小智MCP服务器注册设备工具，使AI可以调用您的设备功能。</p>
+
+  <h3>配置说明</h3>
+  <dl class="message-properties">
+    <dt>小智配置 <span class="property-type">xiaozhi-config</span></dt>
+    <dd>选择已配置的小智MCP连接节点</dd>
+
+    <dt>工具名称 <span class="property-type">string</span></dt>
+    <dd>工具的唯一标识符，只能包含字母、数字、下划线和连字符</dd>
+
+    <dt>工具描述 <span class="property-type">string</span></dt>
+    <dd>工具功能的简要描述，将显示在AI平台上</dd>
+
+    <dt>输入参数Schema <span class="property-type">JSON</span></dt>
+    <dd>定义工具接受的参数格式，使用JSON Schema标准</dd>
+
+    <dt>输出到流程处理 <span class="property-type">boolean</span></dt>
+    <dd>启用时，工具调用会输出到流程；禁用时返回默认响应</dd>
+
+    <dt>启用参数验证 <span class="property-type">boolean</span></dt>
+    <dd>根据Schema验证输入参数的有效性</dd>
+
+    <dt>执行超时 <span class="property-type">number</span></dt>
+    <dd>工具执行的最大等待时间</dd>
+  </dl>
+
+  <h3>输入消息</h3>
+  <p>接收工具调用的响应消息：</p>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt>
+    <dd>工具执行的结果</dd>
+
+    <dt>_mcpCallId <span class="property-type">string</span></dt>
+    <dd>工具调用的唯一标识符，用于匹配响应</dd>
+  </dl>
+
+  <h3>输出消息</h3>
+  <p>当工具被调用时输出：</p>
+  <dl class="message-properties">
+    <dt>payload.toolName <span class="property-type">string</span></dt>
+    <dd>被调用的工具名称</dd>
+
+    <dt>payload.arguments <span class="property-type">object</span></dt>
+    <dd>工具调用的参数</dd>
+
+    <dt>payload.callId <span class="property-type">string</span></dt>
+    <dd>工具调用的唯一标识符</dd>
+
+    <dt>payload.timestamp <span class="property-type">string</span></dt>
+    <dd>调用时间戳</dd>
+
+    <dt>_mcpCallId <span class="property-type">string</span></dt>
+    <dd>用于响应匹配的调用ID</dd>
+  </dl>
+
+  <h3>使用示例</h3>
+  <p><strong>LED控制工具</strong></p>
+  <ol>
+    <li>工具名称：<code>led_control</code></li>
+    <li>工具描述：<code>控制LED灯的开关状态</code></li>
+    <li>输入Schema：
+      <pre>{
+  "type": "object",
+  "properties": {
+    "pin": {
+      "type": "number",
+      "description": "LED引脚号",
+      "minimum": 0,
+      "maximum": 40
+    },
+    "state": {
+      "type": "boolean", 
+      "description": "LED状态"
+    }
+  },
+  "required": ["pin", "state"]
+}</pre>
+    </li>
+    <li>连接function节点处理具体的LED控制逻辑</li>
+    <li>返回执行结果：<code>msg.payload = {result: "LED已开启"}</code></li>
+  </ol>
+
+  <h3>注意事项</h3>
+  <ul>
+    <li>工具名称在同一MCP连接中必须唯一</li>
+    <li>JSON Schema格式必须正确，建议使用内置模板</li>
+    <li>启用"输出到流程处理"时，必须通过输入端口返回响应</li>
+    <li>响应消息必须包含<code>_mcpCallId</code>字段用于匹配</li>
+    <li>超时后会自动返回错误响应，避免AI长时间等待</li>
+  </ul>
+</script>
+
+<style>
+  .red-ui-help {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+  }
+  
+  .red-ui-help h4 {
+    margin: 10px 0 5px 0;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  
+  .red-ui-help pre {
+    background: #f5f5f5;
+    padding: 8px;
+    margin: 5px 0;
+    font-size: 11px;
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+  
+  .red-ui-help ul {
+    margin: 5px 0;
+    padding-left: 20px;
+  }
+  
+  .help-toggle {
+    margin-left: 10px;
+  }
+  
+  #schema-valid {
+    color: #5cb85c;
+  }
+  
+  #schema-error {
+    color: #d9534f;
+  }
+</style>
