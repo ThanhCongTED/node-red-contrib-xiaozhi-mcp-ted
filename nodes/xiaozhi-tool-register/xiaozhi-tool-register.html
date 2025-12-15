@@ -2,29 +2,21 @@
 xiaozhi-tool-register Nút đăng ký công cụ
 Dùng để đăng ký công cụ thiết bị với máy chủ MCP Xiaozhi
 -->
+
 <script type="text/javascript">
-RED.nodes.registerType('xiaozhi-tool-register', {
+  RED.nodes.registerType('xiaozhi-tool-register', {
     category: 'Xiaozhi MCP',
     color: '#87CEEB',
     defaults: {
-        name: { value: '' },
-        xiaozhi: { value: '', type: 'xiaozhi-config', required: true },
-        toolName: { 
-            value: '', 
-            required: true, 
-            validate: RED.validators.regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/) 
-        },
-        toolDescription: { value: '', required: true },
-        inputSchema: { 
-            value: '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}' 
-        },
-        outputToFlow: { value: true },
-        enableValidation: { value: true },
-        asyncExecution: { value: false },
-        executionTimeout: { 
-            value: 30000, 
-            validate: RED.validators.number() 
-        }
+      name: { value: '' },
+      xiaozhi: { value: '', type: 'xiaozhi-config', required: true },
+      toolName: { value: '', required: true, validate: RED.validators.regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/) },
+      toolDescription: { value: '', required: true },
+      inputSchema: { value: '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}' },
+      outputToFlow: { value: true },
+      enableValidation: { value: true },
+      asyncExecution: { value: false },
+      executionTimeout: { value: 30000, validate: RED.validators.number() }
     },
     inputs: 1,
     outputs: 1,
@@ -32,223 +24,262 @@ RED.nodes.registerType('xiaozhi-tool-register', {
     outputLabels: 'Yêu cầu gọi công cụ',
     icon: 'font-awesome/fa-cogs',
     label: function() {
-        return this.name || this.toolName || 'Đăng ký công cụ';
+      return this.name || this.toolName || 'Đăng ký công cụ';
     },
     labelStyle: function() {
-        return this.name ? 'node_label_italic' : '';
+      return this.name ? 'node_label_italic' : '';
     },
     paletteLabel: 'Đăng ký công cụ',
     oneditprepare: function() {
-        var node = this;
-        
-        // Khởi tạo trình chỉnh sửa schema
-        var schemaEditor = null;
-        try {
-            schemaEditor = RED.editor.createEditor({
-                id: 'node-input-inputSchema-editor',
-                mode: 'ace/mode/json',
-                value: node.inputSchema || '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}'
-            });
-        } catch (error) {
-            console.error('Không thể khởi tạo schema editor:', error);
-        }
+      var node = this;
+      
+      // Khởi tạo trình soạn thảo CodeMirror cho JSON Schema
+      var schemaEditor = RED.editor.createEditor({
+        id: 'node-input-inputSchema-editor',
+        mode: 'ace/mode/json',
+        value: node.inputSchema || '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}'
+      });
 
-        // Xác thực schema JSON
-        var validateSchema = function() {
-            try {
-                var schema = schemaEditor ? schemaEditor.getValue() : node.inputSchema;
-                JSON.parse(schema);
-                $('#schema-error').hide();
-                $('#schema-valid').show();
-                return true;
-            } catch (e) {
-                $('#schema-error').text('Lỗi định dạng JSON: ' + e.message).show();
-                $('#schema-valid').hide();
-                return false;
-            }
+      // Lắng nghe thay đổi tên công cụ, tự động tạo mô tả
+      $('#node-input-toolName').on('blur', function() {
+        var toolName = $(this).val();
+        var descriptionField = $('#node-input-toolDescription');
+        
+        if (toolName && !descriptionField.val()) {
+          // Tự động tạo mô tả
+          var description = toolName.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').toLowerCase();
+          description = description.charAt(0).toUpperCase() + description.slice(1);
+          descriptionField.val(description + ' công cụ');
+        }
+      });
+
+      // Xác thực JSON Schema
+      var validateSchema = function() {
+        try {
+          var schema = schemaEditor.getValue();
+          JSON.parse(schema);
+          $('#schema-error').hide();
+          $('#schema-valid').show();
+          return true;
+        } catch (e) {
+          $('#schema-error').text('Lỗi định dạng JSON Schema: ' + e.message).show();
+          $('#schema-valid').hide();
+          return false;
+        }
+      };
+
+      // Lắng nghe thay đổi trình soạn thảo Schema
+      schemaEditor.on('change', function() {
+        setTimeout(validateSchema, 500);
+      });
+
+      // Mẫu Schema định nghĩa trước
+      $('#schema-template').on('change', function() {
+        var template = $(this).val();
+        var schemas = {
+          'simple-string': {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                description: 'Giá trị chuỗi'
+              }
+            },
+            required: ['value']
+          },
+          'simple-number': {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'number',
+                description: 'Giá trị số'
+              }
+            },
+            required: ['value']
+          },
+          'led-control': {
+            type: 'object',
+            properties: {
+              pin: {
+                type: 'number',
+                description: 'Số chân LED',
+                minimum: 0,
+                maximum: 40
+              },
+              state: {
+                type: 'boolean',
+                description: 'Trạng thái LED (true=bật, false=tắt)'
+              }
+            },
+            required: ['pin', 'state']
+          },
+          'sensor-read': {
+            type: 'object',
+            properties: {
+              sensorType: {
+                type: 'string',
+                description: 'Loại cảm biến',
+                enum: ['temperature', 'humidity', 'pressure', 'light']
+              },
+              pin: {
+                type: 'number',
+                description: 'Số chân cảm biến',
+                minimum: 0,
+                maximum: 40
+              }
+            },
+            required: ['sensorType', 'pin']
+          },
+          'motor-control': {
+            type: 'object',
+            properties: {
+              motorId: {
+                type: 'number',
+                description: 'ID động cơ',
+                minimum: 1,
+                maximum: 4
+              },
+              speed: {
+                type: 'number',
+                description: 'Tốc độ động cơ (-100 đến 100)',
+                minimum: -100,
+                maximum: 100
+              },
+              duration: {
+                type: 'number',
+                description: 'Thời gian chạy (miligiây)',
+                minimum: 0
+              }
+            },
+            required: ['motorId', 'speed']
+          }
         };
 
-        // Mẫu Schema định nghĩa trước
-        $('#schema-template').on('change', function() {
-            var template = $(this).val();
-            var schemas = {
-                'simple-string': {
-                    type: 'object',
-                    properties: {
-                        value: {
-                            type: 'string',
-                            description: 'Giá trị chuỗi'
-                        }
-                    },
-                    required: ['value']
-                },
-                'simple-number': {
-                    type: 'object',
-                    properties: {
-                        value: {
-                            type: 'number',
-                            description: 'Giá trị số'
-                        }
-                    },
-                    required: ['value']
-                },
-                'led-control': {
-                    type: 'object',
-                    properties: {
-                        pin: {
-                            type: 'number',
-                            description: 'Số chân LED',
-                            minimum: 0,
-                            maximum: 40
-                        },
-                        state: {
-                            type: 'boolean',
-                            description: 'Trạng thái LED (true=bật, false=tắt)'
-                        }
-                    },
-                    required: ['pin', 'state']
-                },
-                'sensor-read': {
-                    type: 'object',
-                    properties: {
-                        sensorType: {
-                            type: 'string',
-                            description: 'Loại cảm biến',
-                            enum: ['temperature', 'humidity', 'pressure', 'light']
-                        },
-                        pin: {
-                            type: 'number',
-                            description: 'Số chân cảm biến',
-                            minimum: 0,
-                            maximum: 40
-                        }
-                    },
-                    required: ['sensorType', 'pin']
-                },
-                'motor-control': {
-                    type: 'object',
-                    properties: {
-                        motorId: {
-                            type: 'number',
-                            description: 'ID động cơ',
-                            minimum: 1,
-                            maximum: 4
-                        },
-                        speed: {
-                            type: 'number',
-                            description: 'Tốc độ động cơ (-100 đến 100)',
-                            minimum: -100,
-                            maximum: 100
-                        },
-                        duration: {
-                            type: 'number',
-                            description: 'Thời gian chạy (miligiây)',
-                            minimum: 0
-                        }
-                    },
-                    required: ['motorId', 'speed']
-                }
-            };
+        if (template && schemas[template]) {
+          schemaEditor.setValue(JSON.stringify(schemas[template], null, 2));
+          validateSchema();
+        }
+      });
 
-            if (template && schemas[template]) {
-                var newSchema = JSON.stringify(schemas[template], null, 2);
-                
-                // Cập nhật giá trị trong editor
-                if (schemaEditor) {
-                    schemaEditor.setValue(newSchema);
-                }
-                
-                // Cập nhật trực tiếp vào biến node để lưu
-                node.inputSchema = newSchema;
-                
-                // Xác thực schema
-                validateSchema();
-                
-                // Reset dropdown
-                setTimeout(function() {
-                    $('#schema-template').val('');
-                }, 100);
-                
-                RED.notify(`Đã áp dụng mẫu "${template}"`, 'success', 2000);
+      // Xác thực ban đầu
+      setTimeout(validateSchema, 100);
+
+      // Nút kiểm tra kết nối
+      $('#test-connection').on('click', function() {
+        var configNode = $('#node-input-xiaozhi').val();
+        if (!configNode) {
+          RED.notify('Vui lòng chọn nút cấu hình Xiaozhi trước', 'warn');
+          return;
+        }
+
+        var button = $(this);
+        button.prop('disabled', true).text('Đang kiểm tra...');
+
+        $.ajax({
+          url: 'xiaozhi-config/' + configNode + '/status',
+          method: 'GET',
+          success: function(data) {
+            if (data.isConnected) {
+              RED.notify('Kết nối bình thường', 'success');
+            } else {
+              RED.notify('Kết nối bất thường: ' + (data.lastError || 'Chưa kết nối'), 'warn');
             }
+          },
+          error: function() {
+            RED.notify('Không thể lấy trạng thái kết nối', 'error');
+          },
+          complete: function() {
+            button.prop('disabled', false).text('Kiểm tra kết nối');
+          }
         });
+      });
 
-        // Lắng nghe thay đổi trình chỉnh sửa schema
-        if (schemaEditor) {
-            schemaEditor.on('change', function() {
-                setTimeout(function() {
-                    validateSchema();
-                }, 500);
-            });
-        }
-
-        // Khởi tạo xác thực
-        setTimeout(function() {
-            validateSchema();
-        }, 100);
-    },
-    oneditsave: function() {
-        console.log('====== DEBUG: Bắt đầu lưu node ======');
-        console.log('Node ID:', this.id);
-        console.log('inputSchema ban đầu:', this.inputSchema);
-        
-        // Lưu nội dung trình chỉnh sửa schema
-        var schemaEditor = RED.editor.getEditor('node-input-inputSchema-editor');
-        if (schemaEditor) {
-            var schemaValue = schemaEditor.getValue();
-            console.log('Giá trị từ schema editor:', schemaValue);
-            
-            try {
-                JSON.parse(schemaValue);
-                this.inputSchema = schemaValue;
-                console.log('✓ Schema hợp lệ, đã lưu');
-            } catch (e) {
-                console.warn('✗ Schema không hợp lệ:', e.message);
-                this.inputSchema = '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}';
+      // Nút lấy thông tin thống kê
+      $('#get-stats').on('click', function() {
+        if (node.id) {
+          $.ajax({
+            url: 'xiaozhi-tool-register/' + node.id + '/stats',
+            method: 'GET',
+            success: function(data) {
+              var statsText = [
+                'Tên công cụ: ' + data.toolName,
+                'Trạng thái đăng ký: ' + (data.registered ? 'Đã đăng ký' : 'Chưa đăng ký'),
+                'Số lần gọi: ' + data.callCount,
+                'Thời gian thực hiện trung bình: ' + data.averageExecutionTime + 'ms',
+                'Cuộc gọi đang chờ xử lý: ' + data.pendingCalls
+              ];
+              
+              if (data.lastCalledAt) {
+                statsText.push('Lần gọi cuối: ' + new Date(data.lastCalledAt).toLocaleString());
+              }
+              
+              RED.notify(statsText.join('\n'), 'success');
+            },
+            error: function() {
+              RED.notify('Không thể lấy thông tin thống kê', 'error');
             }
+          });
         } else {
-            console.warn('✗ Không tìm thấy schema editor');
+          RED.notify('Vui lòng lưu nút trước khi xem thông tin thống kê', 'warn');
         }
-        
-        console.log('inputSchema sau khi lưu:', this.inputSchema);
-        console.log('====== DEBUG: Kết thúc lưu node ======');
-        
-        // Lưu nội dung trình chỉnh sửa đối số (nếu có)
-        var argsEditor = RED.editor.getEditor('node-input-toolArguments-editor');
-        if (argsEditor) {
-            this.toolArguments = argsEditor.getValue();
-        }
+      });
 
-        // Chuyển đổi đơn vị thời gian chờ
-        var unit = $('#timeout-unit').val();
-        var timeout = parseInt($('#node-input-callTimeout').val()) || 30;
+      // Chuyển đổi đơn vị thời gian chờ
+      $('#timeout-unit').on('change', function() {
+        var unit = $(this).val();
+        var timeoutField = $('#node-input-executionTimeout');
+        var currentValue = parseInt(timeoutField.val()) || 30000;
         
         switch(unit) {
-            case 'seconds':
-                this.callTimeout = timeout * 1000;
-                break;
-            case 'minutes':
-                this.callTimeout = timeout * 60000;
-                break;
-            default: // milliseconds
-                this.callTimeout = timeout;
-                break;
+          case 'seconds':
+            timeoutField.val(Math.round(currentValue / 1000));
+            break;
+          case 'minutes':
+            timeoutField.val(Math.round(currentValue / 60000));
+            break;
+          default: // milliseconds
+            // Giữ nguyên giá trị
+            break;
         }
+      });
+
+      // Chuyển đổi thông tin trợ giúp
+      $('.help-toggle').on('click', function() {
+        var target = $(this).data('target');
+        $(target).toggle();
+      });
+    },
+    oneditsave: function() {
+      // Lưu nội dung trình soạn thảo Schema
+      var schemaEditor = RED.editor.getEditor('node-input-inputSchema-editor');
+      if (schemaEditor) {
+        this.inputSchema = schemaEditor.getValue();
+      }
+
+      // Chuyển đổi đơn vị thời gian chờ
+      var unit = $('#timeout-unit').val();
+      var timeout = parseInt($('#node-input-executionTimeout').val()) || 30;
+      
+      switch(unit) {
+        case 'seconds':
+          this.executionTimeout = timeout * 1000;
+          break;
+        case 'minutes':
+          this.executionTimeout = timeout * 60000;
+          break;
+        default: // milliseconds
+          this.executionTimeout = timeout;
+          break;
+      }
     },
     oneditcancel: function() {
-        // Dọn dẹp trình chỉnh sửa schema
-        var schemaEditor = RED.editor.getEditor('node-input-inputSchema-editor');
-        if (schemaEditor) {
-            schemaEditor.destroy();
-        }
-
-        // Dọn dẹp trình chỉnh sửa đối số (nếu có)
-        var argsEditor = RED.editor.getEditor('node-input-toolArguments-editor');
-        if (argsEditor) {
-            argsEditor.destroy();
-        }
+      // Dọn dẹp trình soạn thảo
+      var schemaEditor = RED.editor.getEditor('node-input-inputSchema-editor');
+      if (schemaEditor) {
+        schemaEditor.destroy();
+      }
     }
-});
+  });
 </script>
 
 <script type="text/html" data-template-name="xiaozhi-tool-register">

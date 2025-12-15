@@ -2,15 +2,15 @@
   {
     "id": "example_flow_1",
     "type": "tab",
-    "label": "小智MCP基础示例",
+    "label": "Ví dụ Cơ bản Xiaozhi MCP",
     "disabled": false,
-    "info": "演示基本的小智MCP连接和工具注册功能",
+    "info": "Trình diễn chức năng kết nối và đăng ký công cụ Xiaozhi MCP cơ bản",
     "env": []
   },
   {
     "id": "config1",
     "type": "xiaozhi-config",
-    "name": "小智连接配置",
+    "name": "Cấu hình Kết nối Xiaozhi",
     "endpoint": "wss://api.xiaozhi.me/mcp",
     "serverName": "NodeRED-Demo",
     "autoReconnect": true,
@@ -20,11 +20,11 @@
   {
     "id": "led_register",
     "type": "xiaozhi-tool-register",
-    "name": "LED控制工具",
+    "name": "Công cụ Điều khiển LED",
     "xiaozhi": "config1",
     "toolName": "led_control",
-    "toolDescription": "控制LED灯的开关状态",
-    "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"pin\": {\n      \"type\": \"number\",\n      \"description\": \"LED引脚号\",\n      \"minimum\": 0,\n      \"maximum\": 40\n    },\n    \"state\": {\n      \"type\": \"boolean\",\n      \"description\": \"LED状态 (true=开启, false=关闭)\"\n    }\n  },\n  \"required\": [\"pin\", \"state\"]\n}",
+    "toolDescription": "Điều khiển trạng thái BẬT/TẮT của đèn LED",
+    "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"pin\": {\n      \"type\": \"number\",\n      \"description\": \"Số chân LED\",\n      \"minimum\": 0,\n      \"maximum\": 40\n    },\n    \"state\": {\n      \"type\": \"boolean\",\n      \"description\": \"Trạng thái LED (true=BẬT, false=TẮT)\"\n    }\n  },\n  \"required\": [\"pin\", \"state\"]\n}",
     "outputToFlow": true,
     "enableValidation": true,
     "executionTimeout": 5000,
@@ -36,8 +36,8 @@
   {
     "id": "led_handler",
     "type": "function",
-    "name": "LED处理逻辑",
-    "func": "// 获取工具调用参数\nconst args = msg.payload.arguments;\nconst pin = args.pin;\nconst state = args.state;\n\n// 模拟LED控制逻辑\nnode.log(`控制LED - 引脚:${pin}, 状态:${state ? '开启' : '关闭'}`);\n\n// 构造响应\nmsg.payload = {\n  result: {\n    success: true,\n    message: `LED引脚${pin}已${state ? '开启' : '关闭'}`,\n    pin: pin,\n    state: state,\n    timestamp: new Date().toISOString()\n  }\n};\n\nreturn msg;",
+    "name": "Xử lý Logic LED",
+    "func": "// Lấy tham số gọi công cụ\nconst args = msg.payload.arguments;\nconst pin = args.pin;\nconst state = args.state;\n\n// Mô phỏng logic điều khiển LED\nnode.log(`Điều khiển LED - Chân:${pin}, Trạng thái:${state ? 'BẬT' : 'TẮT'}`);\n\n// Xây dựng phản hồi\nmsg.payload = {\n  result: {\n    success: true,\n    message: `Chân LED ${pin} đã ${state ? 'BẬT' : 'TẮT'}`,\n    pin: pin,\n    state: state,\n    timestamp: new Date().toISOString()\n  }\n};\n\nreturn msg;",
     "outputs": 1,
     "timeout": "",
     "noerr": 0,
@@ -52,11 +52,11 @@
   {
     "id": "sensor_register",
     "type": "xiaozhi-tool-register",
-    "name": "温度传感器",
+    "name": "Cảm biến Nhiệt độ",
     "xiaozhi": "config1",
     "toolName": "read_temperature",
-    "toolDescription": "读取温度传感器数据",
-    "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"sensorId\": {\n      \"type\": \"string\",\n      \"description\": \"传感器ID\"\n    },\n    \"unit\": {\n      \"type\": \"string\",\n      \"description\": \"温度单位\",\n      \"enum\": [\"celsius\", \"fahrenheit\"],\n      \"default\": \"celsius\"\n    }\n  },\n  \"required\": [\"sensorId\"]\n}",
+    "toolDescription": "Đọc dữ liệu từ cảm biến nhiệt độ",
+    "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"sensorId\": {\n      \"type\": \"string\",\n      \"description\": \"ID Cảm biến\"\n    },\n    \"unit\": {\n      \"type\": \"string\",\n      \"description\": \"Đơn vị nhiệt độ\",\n      \"enum\": [\"celsius\", \"fahrenheit\"],\n      \"default\": \"celsius\"\n    }\n  },\n  \"required\": [\"sensorId\"]\n}",
     "outputToFlow": true,
     "x": 200,
     "y": 200,
@@ -66,8 +66,8 @@
   {
     "id": "sensor_handler",
     "type": "function",
-    "name": "传感器读取",
-    "func": "// 获取传感器参数\nconst args = msg.payload.arguments;\nconst sensorId = args.sensorId;\nconst unit = args.unit || 'celsius';\n\n// 模拟温度读取\nconst temperature = Math.round((Math.random() * 30 + 10) * 10) / 10;\nconst convertedTemp = unit === 'fahrenheit' ? (temperature * 9/5 + 32) : temperature;\n\nnode.log(`读取传感器${sensorId}: ${convertedTemp}°${unit === 'celsius' ? 'C' : 'F'}`);\n\n// 构造响应\nmsg.payload = {\n  result: {\n    sensorId: sensorId,\n    temperature: convertedTemp,\n    unit: unit,\n    timestamp: new Date().toISOString(),\n    status: 'online'\n  }\n};\n\nreturn msg;",
+    "name": "Đọc Cảm biến",
+    "func": "// Lấy tham số cảm biến\nconst args = msg.payload.arguments;\nconst sensorId = args.sensorId;\nconst unit = args.unit || 'celsius';\n\n// Mô phỏng đọc nhiệt độ\nconst temperature = Math.round((Math.random() * 30 + 10) * 10) / 10;\nconst convertedTemp = unit === 'fahrenheit' ? (temperature * 9/5 + 32) : temperature;\n\nnode.log(`Đọc cảm biến ${sensorId}: ${convertedTemp}°${unit === 'celsius' ? 'C' : 'F'}`);\n\n// Xây dựng phản hồi\nmsg.payload = {\n  result: {\n    sensorId: sensorId,\n    temperature: convertedTemp,\n    unit: unit,\n    timestamp: new Date().toISOString(),\n    status: 'online'\n  }\n};\n\nreturn msg;",
     "outputs": 1,
     "x": 420,
     "y": 200,
@@ -77,7 +77,7 @@
   {
     "id": "status_monitor",
     "type": "xiaozhi-status",
-    "name": "状态监控",
+    "name": "Giám sát Trạng thái",
     "xiaozhi": "config1",
     "monitorMode": "auto",
     "outputMode": "changes",
@@ -94,7 +94,7 @@
   {
     "id": "status_debug",
     "type": "debug",
-    "name": "状态输出",
+    "name": "Đầu ra Trạng thái",
     "active": true,
     "tosidebar": true,
     "console": false,
@@ -111,7 +111,7 @@
   {
     "id": "test_inject",
     "type": "inject",
-    "name": "测试工具调用",
+    "name": "Kiểm tra Gọi Công cụ",
     "props": [
       {
         "p": "payload"
@@ -132,7 +132,7 @@
   {
     "id": "test_call",
     "type": "xiaozhi-tool-call",
-    "name": "调用LED工具",
+    "name": "Gọi Công cụ LED",
     "xiaozhi": "config1",
     "targetTool": "led_control",
     "toolArguments": "{\n  \"pin\": 2,\n  \"state\": true\n}",
@@ -150,7 +150,7 @@
   {
     "id": "call_debug",
     "type": "debug",
-    "name": "调用结果",
+    "name": "Kết quả Gọi",
     "active": true,
     "tosidebar": true,
     "console": false,
@@ -165,7 +165,7 @@
   {
     "id": "ping_inject",
     "type": "inject",
-    "name": "发送Ping",
+    "name": "Gửi Ping",
     "props": [
       {
         "p": "payload"
@@ -186,7 +186,7 @@
   {
     "id": "ping_message",
     "type": "xiaozhi-message",
-    "name": "Ping消息",
+    "name": "Tin nhắn Ping",
     "xiaozhi": "config1",
     "messageMode": "send",
     "messageType": "request",
@@ -202,7 +202,7 @@
   {
     "id": "ping_debug",
     "type": "debug",
-    "name": "Ping响应",
+    "name": "Phản hồi Ping",
     "active": true,
     "tosidebar": true,
     "console": false,
