@@ -1,6 +1,6 @@
 /**
- * xiaozhi-message 消息处理节点
- * 用于处理MCP消息的发送、接收和格式化
+ * Nút xử lý tin nhắn xiaozhi-message
+ * Dùng để xử lý việc gửi, nhận và định dạng tin nhắn MCP
  */
 
 module.exports = function(RED) {
@@ -9,7 +9,7 @@ module.exports = function(RED) {
   function XiaozhiMessageNode(config) {
     RED.nodes.createNode(this, config);
 
-    // 配置参数
+    // Tham số cấu hình
     this.name = config.name;
     this.xiaozhi = RED.nodes.getNode(config.xiaozhi);
     this.messageMode = config.messageMode || 'send'; // send, receive, bidirectional
@@ -22,10 +22,10 @@ module.exports = function(RED) {
     this.methodFilter = config.methodFilter || '';
     this.enableLogging = config.enableLogging !== false;
 
-    // 日志记录器
+    // Trình ghi nhật ký
     this.logger = new Logger(`Message[${this.name || this.method || this.id}]`);
 
-    // 消息统计
+    // Thống kê tin nhắn
     this.messageStats = {
       messagesSent: 0,
       messagesReceived: 0,
@@ -37,14 +37,14 @@ module.exports = function(RED) {
       lastError: null
     };
 
-    // 消息历史（用于调试）
+    // Lịch sử tin nhắn (dùng để gỡ lỗi)
     this.messageHistory = [];
     this.maxHistorySize = 50;
 
     const node = this;
 
     /**
-     * 解析消息参数
+     * Phân tích tham số tin nhắn
      */
     this.parseMessageParams = function(source, msg, callback) {
       let paramsJson;
@@ -94,29 +94,29 @@ module.exports = function(RED) {
     };
 
     /**
-     * 生成消息ID
+     * Tạo ID tin nhắn
      */
     this.generateMessageId = function() {
       return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     };
 
     /**
-     * 发送MCP消息
+     * Gửi tin nhắn MCP
      */
     this.sendMessage = async function(messageData, originalMsg) {
       try {
         if (!this.xiaozhi || !this.xiaozhi.mcpClient) {
-          throw new Error('MCP connection not available');
+          throw new Error('Kết nối MCP không khả dụng');
         }
 
         if (!this.xiaozhi.mcpClient.isConnected()) {
-          throw new Error('MCP client not connected');
+          throw new Error('Khách hàng MCP chưa kết nối');
         }
 
         let mcpMessage;
         const messageId = this.generateMessageId();
 
-        // 构造不同类型的MCP消息
+        // Xây dựng các loại tin nhắn MCP khác nhau
         switch (this.messageType) {
         case 'notification':
           mcpMessage = {
@@ -139,7 +139,7 @@ module.exports = function(RED) {
 
         case 'response':
           if (!messageData.id) {
-            throw new Error('Response message requires an ID');
+            throw new Error('Tin nhắn phản hồi yêu cầu một ID');
           }
           mcpMessage = {
             jsonrpc: '2.0',
@@ -155,22 +155,22 @@ module.exports = function(RED) {
           break;
 
         default:
-          throw new Error('Invalid message type: ' + this.messageType);
+          throw new Error('Loại tin nhắn không hợp lệ: ' + this.messageType);
         }
 
-        // 发送消息
+        // Gửi tin nhắn
         await this.xiaozhi.mcpClient.sendRawMessage(mcpMessage);
 
-        // 更新统计
+        // Cập nhật thống kê
         this.messageStats.messagesSent++;
         this.messageStats.lastMessageAt = new Date();
 
-        // 记录历史
+        // Ghi lại lịch sử
         this.addToHistory('sent', mcpMessage, originalMsg);
 
-        this.logger.debug(`Message sent: ${JSON.stringify(mcpMessage)}`);
+        this.logger.debug(`Đã gửi tin nhắn: ${JSON.stringify(mcpMessage)}`);
 
-        // 输出发送确认（如果是双向模式）
+        // Đầu ra xác nhận gửi (nếu là chế độ hai chiều)
         if (this.messageMode === 'bidirectional') {
           const confirmMsg = {
             ...originalMsg,
@@ -191,17 +191,17 @@ module.exports = function(RED) {
       } catch (error) {
         this.messageStats.errors++;
         this.messageStats.lastError = error.message;
-        this.logger.error('Failed to send message:', error.message);
+        this.logger.error('Không thể gửi tin nhắn:', error.message);
         throw error;
       }
     };
 
     /**
-     * 处理接收到的MCP消息
+     * Xử lý tin nhắn MCP nhận được
      */
     this.handleIncomingMessage = function(mcpMessage) {
       try {
-        // 过滤消息
+        // Lọc tin nhắn
         if (this.filterIncoming && this.methodFilter) {
           const filters = this.methodFilter.split(',').map(f => f.trim()).filter(f => f);
           const messageMethod = mcpMessage.method || '';
@@ -209,7 +209,7 @@ module.exports = function(RED) {
           if (filters.length > 0) {
             const matchesFilter = filters.some(filter => {
               if (filter.includes('*')) {
-                // 支持通配符匹配
+                // Hỗ trợ khớp ký tự đại diện
                 const regex = new RegExp(filter.replace(/\*/g, '.*'));
                 return regex.test(messageMethod);
               } else {
@@ -218,38 +218,38 @@ module.exports = function(RED) {
             });
             
             if (!matchesFilter) {
-              return; // 不输出过滤掉的消息
+              return; // Không xuất tin nhắn đã bị lọc
             }
           }
         }
 
-        // 更新统计
+        // Cập nhật thống kê
         this.messageStats.messagesReceived++;
         this.messageStats.lastMessageAt = new Date();
 
-        // 记录历史
+        // Ghi lại lịch sử
         this.addToHistory('received', mcpMessage);
 
-        // 格式化输出
+        // Định dạng đầu ra
         const outputMsg = this.formatOutput(mcpMessage);
 
-        // 发送到适当的输出端口
+        // Gửi đến cổng đầu ra thích hợp
         if (this.messageMode === 'receive') {
           this.send(outputMsg);
         } else if (this.messageMode === 'bidirectional') {
           this.send([null, outputMsg]);
         }
 
-        this.logger.debug(`Message received: ${JSON.stringify(mcpMessage)}`);
+        this.logger.debug(`Đã nhận tin nhắn: ${JSON.stringify(mcpMessage)}`);
 
       } catch (error) {
         this.messageStats.errors++;
-        this.logger.error('Failed to handle incoming message:', error.message);
+        this.logger.error('Không thể xử lý tin nhắn đến:', error.message);
       }
     };
 
     /**
-     * 格式化输出消息
+     * Định dạng tin nhắn đầu ra
      */
     this.formatOutput = function(mcpMessage) {
       const outputMsg = {
@@ -260,7 +260,7 @@ module.exports = function(RED) {
 
       switch (this.outputFormat) {
       case 'payload':
-        // 提取有用的数据到payload
+        // Trích xuất dữ liệu hữu ích vào payload
         if (mcpMessage.method) {
           outputMsg.payload = {
             method: mcpMessage.method,
@@ -283,7 +283,7 @@ module.exports = function(RED) {
         break;
 
       case 'full':
-        // 完整的消息对象
+        // Đối tượng tin nhắn đầy đủ
         outputMsg.payload = {
           jsonrpc: mcpMessage.jsonrpc,
           id: mcpMessage.id,
@@ -297,7 +297,7 @@ module.exports = function(RED) {
         break;
 
       case 'jsonrpc':
-        // 原始JSON-RPC消息
+        // Tin nhắn JSON-RPC gốc
         outputMsg.payload = mcpMessage;
         break;
 
@@ -310,7 +310,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 检测消息类型
+     * Phát hiện loại tin nhắn
      */
     this.detectMessageType = function(mcpMessage) {
       if (mcpMessage.method && !mcpMessage.id) {
@@ -325,7 +325,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 添加到消息历史
+     * Thêm vào lịch sử tin nhắn
      */
     this.addToHistory = function(direction, mcpMessage, originalMsg) {
       this.messageHistory.push({
@@ -338,14 +338,14 @@ module.exports = function(RED) {
         } : undefined
       });
 
-      // 限制历史大小
+      // Giới hạn kích thước lịch sử
       if (this.messageHistory.length > this.maxHistorySize) {
         this.messageHistory.shift();
       }
     };
 
     /**
-     * 更新节点状态显示
+     * Cập nhật hiển thị trạng thái nút
      */
     this.updateStatus = function(state, message, extra) {
       const statusConfig = {
@@ -358,7 +358,7 @@ module.exports = function(RED) {
 
       const status = statusConfig[state] || { fill: 'grey', shape: 'ring', text: message };
       
-      // 添加消息统计
+      // Thêm thống kê tin nhắn
       const totalMessages = this.messageStats.messagesSent + this.messageStats.messagesReceived;
       if (totalMessages > 0) {
         status.text += ` (${totalMessages})`;
@@ -372,7 +372,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 获取消息统计信息
+     * Lấy thông tin thống kê tin nhắn
      */
     this.getStats = function() {
       return {
@@ -386,7 +386,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 获取消息历史
+     * Lấy lịch sử tin nhắn
      */
     this.getMessageHistory = function(limit) {
       const history = this.messageHistory.slice();
@@ -396,9 +396,9 @@ module.exports = function(RED) {
       return history;
     };
 
-    // 处理输入消息
+    // Xử lý tin nhắn đầu vào
     this.on('input', async function(msg, send, done) {
-      // Node-RED 1.0+兼容
+      // Tương thích Node-RED 1.0+
       send = send || function() { node.send.apply(node, arguments); };
       done = done || function(error) { 
         if (error) {
@@ -406,16 +406,16 @@ module.exports = function(RED) {
         }
       };
 
-      // 只有发送模式或双向模式才处理输入
+      // Chỉ xử lý đầu vào ở chế độ gửi hoặc hai chiều
       if (node.messageMode === 'receive') {
         done();
         return;
       }
 
       try {
-        node.updateStatus('sending', '发送中...');
+        node.updateStatus('sending', 'Đang gửi...');
 
-        // 确定消息方法
+        // Xác định phương thức tin nhắn
         let method = node.method;
         if (msg.method && typeof msg.method === 'string') {
           method = msg.method;
@@ -424,21 +424,21 @@ module.exports = function(RED) {
         }
 
         if (!method && node.messageType !== 'response') {
-          throw new Error('Message method not specified');
+          throw new Error('Chưa xác định phương thức tin nhắn');
         }
 
-        // 解析消息参数
+        // Phân tích tham số tin nhắn
         node.parseMessageParams(node.paramsSource, msg, async (parseError, params) => {
           if (parseError) {
-            node.logger.error('Failed to parse message params:', parseError.message);
-            node.updateStatus('error', '参数解析失败');
+            node.logger.error('Không thể phân tích tham số tin nhắn:', parseError.message);
+            node.updateStatus('error', 'Phân tích tham số thất bại');
             node.handleError(parseError, msg);
             done();
             return;
           }
 
           try {
-            // 构造消息数据
+            // Xây dựng dữ liệu tin nhắn
             const messageData = {
               method,
               params,
@@ -447,10 +447,10 @@ module.exports = function(RED) {
               error: msg.error || (msg.payload && msg.payload.error)
             };
 
-            // 发送消息
+            // Gửi tin nhắn
             await node.sendMessage(messageData, msg);
 
-            node.updateStatus('ready', '就绪');
+            node.updateStatus('ready', 'Sẵn sàng');
             done();
 
           } catch (sendError) {
@@ -468,7 +468,7 @@ module.exports = function(RED) {
     });
 
     /**
-     * 处理错误
+     * Xử lý lỗi
      */
     this.handleError = function(error, msg) {
       const errorMsg = {
@@ -483,24 +483,24 @@ module.exports = function(RED) {
       this.error(error.message, errorMsg);
     };
 
-    // 监听MCP连接状态变化
+    // Lắng nghe thay đổi trạng thái kết nối MCP
     if (this.xiaozhi) {
       const callbacks = {
         connected: () => {
-          this.logger.debug('MCP connected');
-          this.updateStatus('ready', '就绪');
+          this.logger.debug('Đã kết nối MCP');
+          this.updateStatus('ready', 'Sẵn sàng');
         },
         disconnected: () => {
-          this.updateStatus('disconnected', 'MCP连接断开');
+          this.updateStatus('disconnected', 'Kết nối MCP bị ngắt');
         },
         error: () => {
-          this.updateStatus('error', 'MCP连接错误');
+          this.updateStatus('error', 'Lỗi kết nối MCP');
         }
       };
 
       this.xiaozhi.registerDependentNode(this.id, callbacks);
 
-      // 如果是接收模式或双向模式，监听消息
+      // Nếu ở chế độ nhận hoặc hai chiều, lắng nghe tin nhắn
       if (this.messageMode === 'receive' || this.messageMode === 'bidirectional') {
         if (this.xiaozhi.mcpClient) {
           this.xiaozhi.mcpClient.on('raw-message', (message) => {
@@ -509,21 +509,21 @@ module.exports = function(RED) {
         }
       }
 
-      // 初始状态
+      // Trạng thái ban đầu
       if (this.xiaozhi.mcpClient && this.xiaozhi.mcpClient.isConnected()) {
-        this.updateStatus('ready', '就绪');
+        this.updateStatus('ready', 'Sẵn sàng');
       } else {
-        this.updateStatus('disconnected', '等待MCP连接');
+        this.updateStatus('disconnected', 'Đang chờ kết nối MCP');
       }
     } else {
-      this.updateStatus('error', '未配置MCP连接');
+      this.updateStatus('error', 'Chưa cấu hình kết nối MCP');
     }
 
-    // 节点关闭时清理
+    // Dọn dẹp khi đóng nút
     this.on('close', function(done) {
-      node.logger.info('Closing message node');
+      node.logger.info('Đang đóng nút tin nhắn');
       
-      // 从MCP配置节点注销
+      // Hủy đăng ký khỏi nút cấu hình MCP
       if (node.xiaozhi) {
         node.xiaozhi.unregisterDependentNode(node.id);
       }
@@ -532,25 +532,25 @@ module.exports = function(RED) {
     });
   }
 
-  // 注册节点类型
+  // Đăng ký loại nút
   RED.nodes.registerType('xiaozhi-message', XiaozhiMessageNode);
 
-  // 提供HTTP端点用于获取消息统计
+  // Cung cấp điểm cuối HTTP để lấy thống kê tin nhắn
   RED.httpAdmin.get('/xiaozhi-message/:id/stats', RED.auth.needsPermission('xiaozhi-message.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
     res.json(node.getStats());
   });
 
-  // 提供HTTP端点用于获取消息历史
+  // Cung cấp điểm cuối HTTP để lấy lịch sử tin nhắn
   RED.httpAdmin.get('/xiaozhi-message/:id/history', RED.auth.needsPermission('xiaozhi-message.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
@@ -558,21 +558,21 @@ module.exports = function(RED) {
     res.json(node.getMessageHistory(limit));
   });
 
-  // 提供HTTP端点用于测试消息发送
+  // Cung cấp điểm cuối HTTP để kiểm tra gửi tin nhắn
   RED.httpAdmin.post('/xiaozhi-message/:id/test', RED.auth.needsPermission('xiaozhi-message.write'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
     const { method, params } = req.body;
     if (!method) {
-      res.status(400).json({ error: 'Method required' });
+      res.status(400).json({ error: 'Yêu cầu phương thức' });
       return;
     }
 
-    // 测试消息发送
+    // Kiểm tra gửi tin nhắn
     const messageData = { method, params: params || {} };
     node.sendMessage(messageData, {}).then(message => {
       res.json({ 

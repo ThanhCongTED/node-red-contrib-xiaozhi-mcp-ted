@@ -1,5 +1,3 @@
-<!-- xiaozhi-config 配置节点HTML界面 -->
-
 <script type="text/javascript">
   RED.nodes.registerType('xiaozhi-config', {
     category: 'config',
@@ -12,7 +10,7 @@
           return v && (v.startsWith('ws://') || v.startsWith('wss://'));
         }
       },
-      serverName: { value: 'NodeRED-Device', required: true },
+      serverName: { value: 'Thiết bị NodeRED', required: true },
       autoReconnect: { value: true },
       reconnectDelay: { 
         value: 5000, 
@@ -43,31 +41,31 @@
       token: { type: 'password', required: true }
     },
     label: function() {
-      return this.name || '小智MCP连接';
+      return this.name || 'Kết nối MCP Xiaozhi';
     },
     oneditprepare: function() {
       const node = this;
       
-      // 设置表单验证和提示
+      // Thiết lập xác thực và gợi ý cho biểu mẫu
       $('#node-config-input-endpoint').on('input change', function() {
         const value = $(this).val();
         const isValid = value && (value.startsWith('ws://') || value.startsWith('wss://'));
         
         if (!isValid && value) {
           $(this).addClass('input-error');
-          $('#endpoint-error').text('请输入有效的WebSocket地址 (ws:// 或 wss://)').show();
+          $('#endpoint-error').text('Vui lòng nhập địa chỉ WebSocket hợp lệ (ws:// hoặc wss://)').show();
         } else {
           $(this).removeClass('input-error');
           $('#endpoint-error').hide();
         }
       });
 
-      // 数值输入验证
+      // Xác thực đầu vào số
       $('#node-config-input-reconnectDelay').on('input change', function() {
         const value = parseInt($(this).val());
         if (isNaN(value) || value < 1000 || value > 300000) {
           $(this).addClass('input-error');
-          $('#reconnect-delay-error').text('重连延迟必须在1000-300000ms之间').show();
+          $('#reconnect-delay-error').text('Độ trễ kết nối lại phải nằm trong khoảng 1000-300000ms').show();
         } else {
           $(this).removeClass('input-error');
           $('#reconnect-delay-error').hide();
@@ -78,7 +76,7 @@
         const value = parseInt($(this).val());
         if (isNaN(value) || value < 10000 || value > 600000) {
           $(this).addClass('input-error');
-          $('#heartbeat-interval-error').text('心跳间隔必须在10000-600000ms之间').show();
+          $('#heartbeat-interval-error').text('Khoảng thời gian nhịp tim phải nằm trong khoảng 10000-600000ms').show();
         } else {
           $(this).removeClass('input-error');
           $('#heartbeat-interval-error').hide();
@@ -89,23 +87,23 @@
         const value = parseInt($(this).val());
         if (isNaN(value) || value < 5000 || value > 120000) {
           $(this).addClass('input-error');
-          $('#request-timeout-error').text('请求超时必须在5000-120000ms之间').show();
+          $('#request-timeout-error').text('Thời gian chờ yêu cầu phải nằm trong khoảng 5000-120000ms').show();
         } else {
           $(this).removeClass('input-error');
           $('#request-timeout-error').hide();
         }
       });
 
-      // 测试连接按钮
+      // Nút kiểm tra kết nối
       $('#test-connection-btn').on('click', function() {
         const btn = $(this);
         const originalText = btn.text();
         
-        // 禁用按钮并显示加载状态
-        btn.prop('disabled', true).text('测试中...');
+        // Vô hiệu hóa nút và hiển thị trạng thái đang tải
+        btn.prop('disabled', true).text('Đang kiểm tra...');
         $('#test-result').hide();
 
-        // 发送测试请求
+        // Gửi yêu cầu kiểm tra
         $.ajax({
           url: `xiaozhi-config/${node.id}/test`,
           type: 'POST',
@@ -120,18 +118,18 @@
               $('#test-result')
                 .removeClass('test-error')
                 .addClass('test-success')
-                .html('<i class="fa fa-check"></i> 连接测试成功')
+                .html('<i class="fa fa-check"></i> Kiểm tra kết nối thành công')
                 .show();
             } else {
               $('#test-result')
                 .removeClass('test-success')
                 .addClass('test-error')
-                .html('<i class="fa fa-times"></i> 连接失败: ' + (data.error || '未知错误'))
+                .html('<i class="fa fa-times"></i> Kết nối thất bại: ' + (data.error || 'Lỗi không xác định'))
                 .show();
             }
           },
           error: function(xhr) {
-            let errorMsg = '测试失败';
+            let errorMsg = 'Kiểm tra thất bại';
             try {
               const response = JSON.parse(xhr.responseText);
               errorMsg = response.error || errorMsg;
@@ -146,13 +144,13 @@
               .show();
           },
           complete: function() {
-            // 恢复按钮状态
+            // Khôi phục trạng thái nút
             btn.prop('disabled', false).text(originalText);
           }
         });
       });
 
-      // 展开/收起高级设置
+      // Mở rộng/Thu gọn cài đặt nâng cao
       $('#advanced-toggle').on('click', function() {
         $('#advanced-settings').toggle();
         const icon = $(this).find('i');
@@ -163,12 +161,12 @@
         }
       });
 
-      // 初始化高级设置状态
+      // Khởi tạo trạng thái cài đặt nâng cao
       $('#advanced-settings').hide();
     },
 
     oneditsave: function() {
-      // 验证所有必填字段
+      // Xác thực tất cả các trường bắt buộc
       let isValid = true;
       
       if (!$('#node-config-input-name').val().trim()) {
@@ -190,138 +188,138 @@
 
 <script type="text/html" data-template-name="xiaozhi-config">
   <div class="form-row">
-    <label for="node-config-input-name"><i class="fa fa-tag"></i> 连接名称</label>
-    <input type="text" id="node-config-input-name" placeholder="输入连接名称，如：小智连接1">
+    <label for="node-config-input-name"><i class="fa fa-tag"></i> Tên kết nối</label>
+    <input type="text" id="node-config-input-name" placeholder="Nhập tên kết nối, ví dụ: Kết nối Xiaozhi 1">
   </div>
 
   <div class="form-row">
-    <label for="node-config-input-endpoint"><i class="fa fa-globe"></i> 服务器地址</label>
+    <label for="node-config-input-endpoint"><i class="fa fa-globe"></i> Địa chỉ máy chủ</label>
     <input type="text" id="node-config-input-endpoint" placeholder="wss://api.xiaozhi.me/mcp/">
     <div id="endpoint-error" class="form-tips" style="color: red; display: none;"></div>
     <div class="form-tips">
-      <strong>提示：</strong>输入小智MCP服务器的WebSocket地址，支持ws://和wss://协议
+      <strong>Gợi ý:</strong> Nhập địa chỉ máy chủ MCP của Xiaozhi, hỗ trợ giao thức ws:// và wss://
     </div>
   </div>
 
   <div class="form-row">
-    <label for="node-config-input-token"><i class="fa fa-key"></i> 访问令牌</label>
-    <input type="password" id="node-config-input-token" placeholder="输入访问令牌">
+    <label for="node-config-input-token"><i class="fa fa-key"></i> Mã truy cập</label>
+    <input type="password" id="node-config-input-token" placeholder="Nhập mã truy cập">
     <div class="form-tips">
-      <strong>提示：</strong>从小智平台获取的访问令牌，用于身份验证
+      <strong>Gợi ý:</strong> Mã truy cập được lấy từ nền tảng Xiaozhi, dùng để xác thực
     </div>
   </div>
 
   <div class="form-row">
-    <label for="node-config-input-serverName"><i class="fa fa-server"></i> 设备名称</label>
-    <input type="text" id="node-config-input-serverName" placeholder="NodeRED-Device">
+    <label for="node-config-input-serverName"><i class="fa fa-server"></i> Tên thiết bị</label>
+    <input type="text" id="node-config-input-serverName" placeholder="Thiết bị NodeRED">
     <div class="form-tips">
-      <strong>提示：</strong>在小智平台中显示的设备名称
+      <strong>Gợi ý:</strong> Tên thiết bị hiển thị trên nền tảng Xiaozhi
     </div>
   </div>
 
   <div class="form-row">
     <input type="checkbox" id="node-config-input-autoReconnect" style="width: 20px; margin-right: 5px;">
-    <label for="node-config-input-autoReconnect" style="width: auto;">启用自动重连</label>
+    <label for="node-config-input-autoReconnect" style="width: auto;">Bật kết nối lại tự động</label>
     <div class="form-tips">
-      <strong>提示：</strong>网络断开时自动尝试重新连接
+      <strong>Gợi ý:</strong> Tự động thử kết nối lại khi mạng bị ngắt
     </div>
   </div>
 
-  <!-- 高级设置 -->
+  <!-- Cài đặt nâng cao -->
   <div class="form-row">
     <label style="width: auto; cursor: pointer;" id="advanced-toggle">
-      <i class="fa fa-chevron-down"></i> 高级设置
+      <i class="fa fa-chevron-down"></i> Cài đặt nâng cao
     </label>
   </div>
 
   <div id="advanced-settings">
     <div class="form-row">
-      <label for="node-config-input-reconnectDelay"><i class="fa fa-clock-o"></i> 重连延迟 (毫秒)</label>
+      <label for="node-config-input-reconnectDelay"><i class="fa fa-clock-o"></i> Độ trễ kết nối lại (mili giây)</label>
       <input type="number" id="node-config-input-reconnectDelay" min="1000" max="300000" step="1000">
       <div id="reconnect-delay-error" class="form-tips" style="color: red; display: none;"></div>
       <div class="form-tips">
-        <strong>范围：</strong>1000-300000毫秒，建议5000毫秒
+        <strong>Phạm vi:</strong> 1000-300000 mili giây, đề xuất 5000 mili giây
       </div>
     </div>
 
     <div class="form-row">
-      <label for="node-config-input-heartbeatInterval"><i class="fa fa-heartbeat"></i> 心跳间隔 (毫秒)</label>
+      <label for="node-config-input-heartbeatInterval"><i class="fa fa-heartbeat"></i> Khoảng thời gian nhịp tim (mili giây)</label>
       <input type="number" id="node-config-input-heartbeatInterval" min="10000" max="600000" step="5000">
       <div id="heartbeat-interval-error" class="form-tips" style="color: red; display: none;"></div>
       <div class="form-tips">
-        <strong>范围：</strong>10000-600000毫秒，建议30000毫秒
+        <strong>Phạm vi:</strong> 10000-600000 mili giây, đề xuất 30000 mili giây
       </div>
     </div>
 
     <div class="form-row">
-      <label for="node-config-input-requestTimeout"><i class="fa fa-hourglass-half"></i> 请求超时 (毫秒)</label>
+      <label for="node-config-input-requestTimeout"><i class="fa fa-hourglass-half"></i> Thời gian chờ yêu cầu (mili giây)</label>
       <input type="number" id="node-config-input-requestTimeout" min="5000" max="120000" step="5000">
       <div id="request-timeout-error" class="form-tips" style="color: red; display: none;"></div>
       <div class="form-tips">
-        <strong>范围：</strong>5000-120000毫秒，建议30000毫秒
+        <strong>Phạm vi:</strong> 5000-120000 mili giây, đề xuất 30000 mili giây
       </div>
     </div>
   </div>
 
-  <!-- 连接测试 -->
+  <!-- Kiểm tra kết nối -->
   <div class="form-row">
     <label></label>
     <button type="button" id="test-connection-btn" class="red-ui-button">
-      <i class="fa fa-plug"></i> 测试连接
+      <i class="fa fa-plug"></i> Kiểm tra kết nối
     </button>
     <div id="test-result" style="margin-top: 10px; padding: 10px; border-radius: 3px; display: none;"></div>
   </div>
 </script>
 
 <script type="text/html" data-help-name="xiaozhi-config">
-  <p>配置与小智MCP服务器的连接参数。</p>
+  <p>Cấu hình các tham số kết nối với máy chủ MCP Xiaozhi.</p>
 
-  <h3>配置说明</h3>
+  <h3>Mô tả cấu hình</h3>
   <dl class="message-properties">
-    <dt>连接名称</dt>
-    <dd>用于标识此连接配置的名称，建议使用有意义的名称</dd>
+    <dt>Tên kết nối</dt>
+    <dd>Tên được sử dụng để xác định cấu hình kết nối này, nên sử dụng tên có ý nghĩa</dd>
 
-    <dt>服务器地址</dt>
-    <dd>小智MCP服务器的WebSocket地址，支持ws://和wss://协议。通常为：wss://api.xiaozhi.me/mcp/</dd>
+    <dt>Địa chỉ máy chủ</dt>
+    <dd>Địa chỉ WebSocket của máy chủ MCP Xiaozhi, hỗ trợ giao thức ws:// và wss://. Thông thường là: wss://api.xiaozhi.me/mcp/</dd>
 
-    <dt>访问令牌</dt>
-    <dd>从小智平台获取的访问令牌，用于身份验证。请妥善保管此令牌</dd>
+    <dt>Mã truy cập</dt>
+    <dd>Mã truy cập được lấy từ nền tảng Xiaozhi, dùng để xác thực. Vui lòng bảo quản mã này cẩn thận</dd>
 
-    <dt>设备名称</dt>
-    <dd>在小智平台中显示的设备名称，有助于识别设备</dd>
+    <dt>Tên thiết bị</dt>
+    <dd>Tên thiết bị hiển thị trên nền tảng Xiaozhi, giúp nhận diện thiết bị</dd>
 
-    <dt>自动重连</dt>
-    <dd>启用后，网络断开时会自动尝试重新连接</dd>
+    <dt>Kết nối lại tự động</dt>
+    <dd>Khi được bật, sẽ tự động thử kết nối lại khi mạng bị ngắt</dd>
   </dl>
 
-  <h3>高级设置</h3>
+  <h3>Cài đặt nâng cao</h3>
   <dl class="message-properties">
-    <dt>重连延迟</dt>
-    <dd>自动重连的延迟时间（毫秒），建议设置为5000毫秒</dd>
+    <dt>Độ trễ kết nối lại</dt>
+    <dd>Thời gian trễ kết nối lại tự động (mili giây), đề xuất đặt là 5000 mili giây</dd>
 
-    <dt>心跳间隔</dt>
-    <dd>发送心跳消息的间隔（毫秒），用于保持连接活跃，建议30000毫秒</dd>
+    <dt>Khoảng thời gian nhịp tim</dt>
+    <dd>Khoảng thời gian gửi tin nhắn nhịp tim (mili giây), dùng để duy trì kết nối hoạt động, đề xuất 30000 mili giây</dd>
 
-    <dt>请求超时</dt>
-    <dd>等待服务器响应的超时时间（毫秒），建议30000毫秒</dd>
+    <dt>Thời gian chờ yêu cầu</dt>
+    <dd>Thời gian chờ phản hồi từ máy chủ (mili giây), đề xuất 30000 mili giây</dd>
   </dl>
 
-  <h3>使用步骤</h3>
+  <h3>Các bước sử dụng</h3>
   <ol>
-    <li>填写连接名称，如"小智连接1"</li>
-    <li>输入小智MCP服务器地址</li>
-    <li>输入从小智平台获取的访问令牌</li>
-    <li>设置设备名称（可选）</li>
-    <li>根据需要调整高级设置</li>
-    <li>点击"测试连接"验证配置是否正确</li>
-    <li>保存配置</li>
+    <li>Điền tên kết nối, ví dụ "Kết nối Xiaozhi 1"</li>
+    <li>Nhập địa chỉ máy chủ MCP của Xiaozhi</li>
+    <li>Nhập mã truy cập lấy từ nền tảng Xiaozhi</li>
+    <li>Đặt tên thiết bị (tùy chọn)</li>
+    <li>Điều chỉnh cài đặt nâng cao nếu cần</li>
+    <li>Nhấp vào "Kiểm tra kết nối" để xác minh cấu hình có chính xác không</li>
+    <li>Lưu cấu hình</li>
   </ol>
 
-  <h3>故障排除</h3>
+  <h3>Khắc phục sự cố</h3>
   <ul>
-    <li><strong>连接失败</strong>: 检查服务器地址和网络连接</li>
-    <li><strong>认证失败</strong>: 确认访问令牌是否正确且未过期</li>
-    <li><strong>频繁断开</strong>: 调整心跳间隔和重连延迟</li>
+    <li><strong>Kết nối thất bại</strong>: Kiểm tra địa chỉ máy chủ và kết nối mạng</li>
+    <li><strong>Xác thực thất bại</strong>: Xác nhận mã truy cập có chính xác và chưa hết hạn không</li>
+    <li><strong>Ngắt kết nối thường xuyên</strong>: Điều chỉnh khoảng thời gian nhịp tim và độ trễ kết nối lại</li>
   </ul>
 </script>
 

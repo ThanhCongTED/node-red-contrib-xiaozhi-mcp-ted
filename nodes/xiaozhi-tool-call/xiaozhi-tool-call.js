@@ -1,6 +1,6 @@
 /**
- * xiaozhi-tool-call 工具调用节点
- * 用于主动调用小智平台或其他设备的工具
+ * Nút gọi công cụ xiaozhi-tool-call
+ * Dùng để chủ động gọi các công cụ trên nền tảng Xiaozhi hoặc các thiết bị khác
  */
 
 module.exports = function(RED) {
@@ -10,7 +10,7 @@ module.exports = function(RED) {
   function XiaozhiToolCallNode(config) {
     RED.nodes.createNode(this, config);
 
-    // 配置参数
+    // Tham số cấu hình
     this.name = config.name;
     this.xiaozhi = RED.nodes.getNode(config.xiaozhi);
     this.targetTool = config.targetTool || '';
@@ -22,10 +22,10 @@ module.exports = function(RED) {
     this.retryAttempts = parseInt(config.retryAttempts) || 0;
     this.retryDelay = parseInt(config.retryDelay) || 1000;
 
-    // 日志记录器
+    // Trình ghi nhật ký
     this.logger = new Logger(`ToolCall[${this.name || this.targetTool || this.id}]`);
 
-    // 调用统计
+    // Thống kê gọi
     this.callStats = {
       totalCalls: 0,
       successfulCalls: 0,
@@ -38,7 +38,7 @@ module.exports = function(RED) {
     const node = this;
 
     /**
-     * 解析工具参数
+     * Phân tích đối số công cụ
      */
     this.parseToolArguments = function(source, msg, callback) {
       let argsJson;
@@ -88,35 +88,35 @@ module.exports = function(RED) {
     };
 
     /**
-     * 调用工具
+     * Gọi công cụ
      */
     this.callTool = async function(toolName, args, attempt = 1) {
       const startTime = Date.now();
       
       try {
-        this.logger.debug(`Calling tool: ${toolName}, args:`, args);
+        this.logger.debug(`Đang gọi công cụ: ${toolName}, args:`, args);
 
-        // 检查MCP连接
+        // Kiểm tra kết nối MCP
         if (!this.xiaozhi || !this.xiaozhi.mcpClient) {
-          throw new Error('MCP connection not available');
+          throw new Error('Kết nối MCP không khả dụng');
         }
 
         if (!this.xiaozhi.mcpClient.isConnected()) {
-          throw new Error('MCP client not connected');
+          throw new Error('Khách hàng MCP chưa kết nối');
         }
 
-        // 调用工具
+        // Gọi công cụ
         const result = await this.xiaozhi.mcpClient.callTool(toolName, args, {
           timeout: this.callTimeout
         });
 
-        // 更新统计信息
+        // Cập nhật thông tin thống kê
         this.callStats.totalCalls++;
         this.callStats.successfulCalls++;
         this.callStats.lastCallAt = new Date();
         this._updateResponseTime(startTime);
 
-        this.logger.debug(`Tool call successful: ${toolName}, response time: ${Date.now() - startTime}ms`);
+        this.logger.debug(`Gọi công cụ thành công: ${toolName}, thời gian phản hồi: ${Date.now() - startTime}ms`);
 
         return result;
 
@@ -126,11 +126,11 @@ module.exports = function(RED) {
         this.callStats.lastError = error.message;
         this.callStats.lastCallAt = new Date();
 
-        this.logger.error(`Tool call failed: ${toolName} (attempt ${attempt}):`, error.message);
+        this.logger.error(`Gọi công cụ thất bại: ${toolName} (lần thử ${attempt}):`, error.message);
 
-        // 重试逻辑
+        // Logic thử lại
         if (attempt <= this.retryAttempts) {
-          this.logger.info(`Retrying tool call in ${this.retryDelay}ms (attempt ${attempt + 1}/${this.retryAttempts + 1})`);
+          this.logger.info(`Sẽ thử lại gọi công cụ sau ${this.retryDelay}ms (lần thử ${attempt + 1}/${this.retryAttempts + 1})`);
           
           await new Promise(resolve => setTimeout(resolve, this.retryDelay));
           return await this.callTool(toolName, args, attempt + 1);
@@ -141,7 +141,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 格式化输出结果
+     * Định dạng kết quả đầu ra
      */
     this.formatOutput = function(result, mode, originalMsg) {
       const baseOutput = {
@@ -155,10 +155,10 @@ module.exports = function(RED) {
 
       switch (mode) {
       case 'result':
-        // 只输出结果内容
+        // Chỉ xuất nội dung kết quả
         if (result.content && result.content.length > 0) {
           if (result.content.length === 1 && result.content[0].type === 'text') {
-            // 单个文本结果，尝试解析JSON
+            // Kết quả văn bản đơn lẻ, thử phân tích JSON
             try {
               const parsed = JSON.parse(result.content[0].text);
               baseOutput.payload = parsed;
@@ -174,12 +174,12 @@ module.exports = function(RED) {
         return baseOutput;
 
       case 'full':
-        // 输出完整响应
+        // Xuất phản hồi đầy đủ
         baseOutput.payload = result;
         return baseOutput;
 
       case 'split': {
-        // 分别输出结果和元数据
+        // Xuất riêng kết quả và siêu dữ liệu
         const resultOutput = { ...baseOutput };
         if (result.content && result.content.length > 0) {
           if (result.content.length === 1 && result.content[0].type === 'text') {
@@ -215,7 +215,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 处理错误
+     * Xử lý lỗi
      */
     this.handleError = function(error, originalMsg) {
       const errorMsg = {
@@ -235,19 +235,19 @@ module.exports = function(RED) {
 
       switch (this.errorHandling) {
       case 'throw':
-        // 抛出异常，Node-RED会显示错误状态
+        // Ném ngoại lệ, Node-RED sẽ hiển thị trạng thái lỗi
         this.error(error.message, errorMsg);
         break;
 
       case 'output': {
-        // 输出错误消息
+        // Xuất thông báo lỗi
         errorMsg.payload = {
           error: error.message,
           toolName: this.targetTool
         };
           
         if (this.outputMode === 'split') {
-          this.send([null, errorMsg]); // 发送到第二个输出端口
+          this.send([null, errorMsg]); // Gửi đến cổng đầu ra thứ hai
         } else {
           this.send(errorMsg);
         }
@@ -255,8 +255,8 @@ module.exports = function(RED) {
       }
 
       case 'ignore':
-        // 忽略错误，不输出任何内容
-        this.logger.warn(`Ignoring tool call error: ${error.message}`);
+        // Bỏ qua lỗi, không xuất bất kỳ nội dung nào
+        this.logger.warn(`Bỏ qua lỗi gọi công cụ: ${error.message}`);
         break;
 
       default:
@@ -266,19 +266,19 @@ module.exports = function(RED) {
     };
 
     /**
-     * 更新响应时间统计
+     * Cập nhật thống kê thời gian phản hồi
      */
     this._updateResponseTime = function(startTime) {
       const responseTime = Date.now() - startTime;
       
-      // 计算移动平均响应时间
+      // Tính thời gian phản hồi trung bình di động
       const alpha = 0.1;
       this.callStats.averageResponseTime = 
         this.callStats.averageResponseTime * (1 - alpha) + responseTime * alpha;
     };
 
     /**
-     * 更新节点状态显示
+     * Cập nhật hiển thị trạng thái nút
      */
     this.updateStatus = function(state, message) {
       const statusConfig = {
@@ -290,16 +290,16 @@ module.exports = function(RED) {
 
       const status = statusConfig[state] || { fill: 'grey', shape: 'ring', text: message };
       
-      // 添加调用统计信息
+      // Thêm thông tin thống kê gọi
       if (this.callStats.totalCalls > 0) {
-        status.text += ` (${this.callStats.totalCalls}次)`;
+        status.text += ` (${this.callStats.totalCalls} lần)`;
       }
       
       this.status(status);
     };
 
     /**
-     * 获取工具统计信息
+     * Lấy thông tin thống kê công cụ
      */
     this.getStats = function() {
       return {
@@ -311,9 +311,9 @@ module.exports = function(RED) {
       };
     };
 
-    // 处理输入消息
+    // Xử lý tin nhắn đầu vào
     this.on('input', async function(msg, send, done) {
-      // Node-RED 1.0+兼容
+      // Tương thích Node-RED 1.0+
       send = send || function() { node.send.apply(node, arguments); };
       done = done || function(error) { 
         if (error) {
@@ -322,10 +322,10 @@ module.exports = function(RED) {
       };
 
       try {
-        // 记录开始时间
+        // Ghi lại thời gian bắt đầu
         msg._startTime = Date.now();
 
-        // 确定目标工具名称
+        // Xác định tên công cụ mục tiêu
         let toolName = this.targetTool;
         if (msg.tool && typeof msg.tool === 'string') {
           toolName = msg.tool;
@@ -334,37 +334,37 @@ module.exports = function(RED) {
         }
 
         if (!toolName) {
-          throw new Error('Tool name not specified');
+          throw new Error('Chưa xác định tên công cụ');
         }
 
-        // 更新状态
-        this.updateStatus('calling', `调用 ${toolName}`);
+        // Cập nhật trạng thái
+        this.updateStatus('calling', `Đang gọi ${toolName}`);
 
-        // 解析工具参数
+        // Phân tích đối số công cụ
         this.parseToolArguments(this.argumentsSource, msg, async (parseError, args) => {
           if (parseError) {
-            this.logger.error('Failed to parse tool arguments:', parseError.message);
-            this.updateStatus('error', '参数解析失败');
+            this.logger.error('Không thể phân tích đối số công cụ:', parseError.message);
+            this.updateStatus('error', 'Phân tích tham số thất bại');
             this.handleError(parseError, msg);
             done();
             return;
           }
 
           try {
-            // 调用工具
+            // Gọi công cụ
             const result = await this.callTool(toolName, args);
 
-            // 格式化输出
+            // Định dạng đầu ra
             const output = this.formatOutput(result, this.outputMode, msg);
 
-            // 发送结果
+            // Gửi kết quả
             if (Array.isArray(output)) {
-              send(output); // split模式
+              send(output); // Chế độ tách
             } else {
               send(output);
             }
 
-            this.updateStatus('ready', '就绪');
+            this.updateStatus('ready', 'Sẵn sàng');
             done();
 
           } catch (callError) {
@@ -381,38 +381,38 @@ module.exports = function(RED) {
       }
     });
 
-    // 监听MCP连接状态变化
+    // Lắng nghe thay đổi trạng thái kết nối MCP
     if (this.xiaozhi) {
       const callbacks = {
         connected: () => {
-          this.logger.debug('MCP connected');
-          this.updateStatus('ready', '就绪');
+          this.logger.debug('Đã kết nối MCP');
+          this.updateStatus('ready', 'Sẵn sàng');
         },
         disconnected: () => {
-          this.updateStatus('disconnected', 'MCP连接断开');
+          this.updateStatus('disconnected', 'Kết nối MCP bị ngắt');
         },
         error: () => {
-          this.updateStatus('error', 'MCP连接错误');
+          this.updateStatus('error', 'Lỗi kết nối MCP');
         }
       };
 
       this.xiaozhi.registerDependentNode(this.id, callbacks);
 
-      // 初始状态
+      // Trạng thái ban đầu
       if (this.xiaozhi.mcpClient && this.xiaozhi.mcpClient.isConnected()) {
-        this.updateStatus('ready', '就绪');
+        this.updateStatus('ready', 'Sẵn sàng');
       } else {
-        this.updateStatus('disconnected', '等待MCP连接');
+        this.updateStatus('disconnected', 'Đang chờ kết nối MCP');
       }
     } else {
-      this.updateStatus('error', '未配置MCP连接');
+      this.updateStatus('error', 'Chưa cấu hình kết nối MCP');
     }
 
-    // 节点关闭时清理
+    // Dọn dẹp khi đóng nút
     this.on('close', function(done) {
-      node.logger.info('Closing tool call node');
+      node.logger.info('Đang đóng nút gọi công cụ');
       
-      // 从MCP配置节点注销
+      // Hủy đăng ký khỏi nút cấu hình MCP
       if (node.xiaozhi) {
         node.xiaozhi.unregisterDependentNode(node.id);
       }
@@ -421,25 +421,25 @@ module.exports = function(RED) {
     });
   }
 
-  // 注册节点类型
+  // Đăng ký loại nút
   RED.nodes.registerType('xiaozhi-tool-call', XiaozhiToolCallNode);
 
-  // 提供HTTP端点用于获取工具统计信息
+  // Cung cấp điểm cuối HTTP để lấy thông tin thống kê công cụ
   RED.httpAdmin.get('/xiaozhi-tool-call/:id/stats', RED.auth.needsPermission('xiaozhi-tool-call.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
     res.json(node.getStats());
   });
 
-  // 提供HTTP端点用于获取可用工具列表
+  // Cung cấp điểm cuối HTTP để lấy danh sách công cụ có sẵn
   RED.httpAdmin.get('/xiaozhi-tool-call/:id/tools', RED.auth.needsPermission('xiaozhi-tool-call.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node || !node.xiaozhi || !node.xiaozhi.mcpClient) {
-      res.status(404).json({ error: 'MCP client not available' });
+      res.status(404).json({ error: 'Khách hàng MCP không khả dụng' });
       return;
     }
 
@@ -451,21 +451,21 @@ module.exports = function(RED) {
     }
   });
 
-  // 提供HTTP端点用于测试工具调用
+  // Cung cấp điểm cuối HTTP để kiểm tra gọi công cụ
   RED.httpAdmin.post('/xiaozhi-tool-call/:id/test', RED.auth.needsPermission('xiaozhi-tool-call.write'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
     const { toolName, args } = req.body;
     if (!toolName) {
-      res.status(400).json({ error: 'Tool name required' });
+      res.status(400).json({ error: 'Yêu cầu tên công cụ' });
       return;
     }
 
-    // 测试工具调用
+    // Kiểm tra gọi công cụ
     node.callTool(toolName, args || {}).then(result => {
       res.json({ 
         success: true, 

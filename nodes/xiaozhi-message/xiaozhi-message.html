@@ -1,11 +1,11 @@
 <!--
-xiaozhi-message 消息处理节点
-用于处理MCP消息的发送、接收和格式化
+Nút xử lý tin nhắn xiaozhi-message
+Dùng để xử lý việc gửi, nhận và định dạng tin nhắn MCP
 -->
 
 <script type="text/javascript">
   RED.nodes.registerType('xiaozhi-message', {
-    category: '小智MCP',
+    category: '小智MCP', // Giữ nguyên category nếu đây là tên nhóm
     color: '#DDA0DD',
     defaults: {
       name: { value: '' },
@@ -28,28 +28,28 @@ xiaozhi-message 消息处理节点
     },
     outputLabels: function() {
       if (this.messageMode === 'bidirectional') {
-        return ['发送确认', '接收消息'];
+        return ['Xác nhận gửi', 'Tin nhắn nhận'];
       }
-      return this.messageMode === 'receive' ? '接收消息' : '发送确认';
+      return this.messageMode === 'receive' ? 'Tin nhắn nhận' : 'Xác nhận gửi';
     },
     icon: 'font-awesome/fa-exchange',
     label: function() {
       if (this.name) return this.name;
-      if (this.method) return `消息: ${this.method}`;
-      return '消息处理';
+      if (this.method) return `Tin nhắn: ${this.method}`;
+      return 'Xử lý tin nhắn';
     },
-    paletteLabel: '消息处理',
+    paletteLabel: 'Xử lý tin nhắn', // Nhãn trên thanh công cụ
     oneditprepare: function() {
       var node = this;
       
-      // 初始化参数编辑器
+      // Khởi tạo trình chỉnh sửa tham số
       var paramsEditor = RED.editor.createEditor({
         id: 'node-input-params-editor',
         mode: 'ace/mode/json',
         value: node.params || '{}'
       });
 
-      // 消息模式变化处理
+      // Xử lý thay đổi chế độ tin nhắn
       $('#node-input-messageMode').on('change', function() {
         var mode = $(this).val();
         var sendOptions = $('#send-options');
@@ -67,14 +67,14 @@ xiaozhi-message 消息处理节点
         }
       });
 
-      // 参数来源变化处理
+      // Xử lý thay đổi nguồn tham số
       $('#node-input-paramsSource').on('change', function() {
         var source = $(this).val();
         var paramsContainer = $('#params-editor-container');
         paramsContainer.toggle(source === 'configured');
       });
 
-      // JSON参数验证
+      // Xác thực tham số JSON
       var validateParams = function() {
         try {
           JSON.parse(paramsEditor.getValue());
@@ -82,7 +82,7 @@ xiaozhi-message 消息处理节点
           $('#params-valid').show();
           return true;
         } catch (e) {
-          $('#params-error').text('JSON格式错误: ' + e.message).show();
+          $('#params-error').text('Lỗi định dạng JSON: ' + e.message).show();
           $('#params-valid').hide();
           return false;
         }
@@ -92,7 +92,7 @@ xiaozhi-message 消息处理节点
         setTimeout(validateParams, 500);
       });
 
-      // 预定义模板
+      // Mẫu định nghĩa trước
       $('#method-template').on('change', function() {
         var template = $(this).val();
         var templates = {
@@ -106,10 +106,10 @@ xiaozhi-message 消息处理节点
         }
       });
 
-      // 测试发送
+      // Kiểm tra gửi
       $('#test-send').on('click', function() {
         if (!node.id) {
-          RED.notify('请先保存节点配置', 'warn');
+          RED.notify('Vui lòng lưu cấu hình nút trước', 'warn');
           return;
         }
         var method = $('#node-input-method').val();
@@ -117,7 +117,7 @@ xiaozhi-message 消息处理节点
         try {
           params = JSON.parse(paramsEditor.getValue());
         } catch (e) {
-          RED.notify('参数JSON格式错误', 'error');
+          RED.notify('Lỗi định dạng JSON tham số', 'error');
           return;
         }
 
@@ -127,16 +127,16 @@ xiaozhi-message 消息处理节点
           contentType: 'application/json',
           data: JSON.stringify({ method, params }),
           success: function(data) {
-            RED.notify(data.success ? '消息发送成功' : '发送失败: ' + data.error, 
+            RED.notify(data.success ? 'Gửi tin nhắn thành công' : 'Gửi thất bại: ' + data.error, 
                       data.success ? 'success' : 'error');
           },
           error: function() {
-            RED.notify('发送失败', 'error');
+            RED.notify('Gửi thất bại', 'error');
           }
         });
       });
 
-      // 初始化
+      // Khởi tạo
       setTimeout(function() {
         $('#node-input-messageMode').trigger('change');
         $('#node-input-paramsSource').trigger('change');
@@ -160,39 +160,39 @@ xiaozhi-message 消息处理节点
 
 <script type="text/html" data-template-name="xiaozhi-message">
   <div class="form-row">
-    <label for="node-input-name"><i class="fa fa-tag"></i> 节点名称</label>
-    <input type="text" id="node-input-name" placeholder="可选的节点名称">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Tên nút</label>
+    <input type="text" id="node-input-name" placeholder="Tên nút (tùy chọn)">
   </div>
 
   <div class="form-row">
-    <label for="node-input-xiaozhi"><i class="fa fa-plug"></i> 小智配置</label>
+    <label for="node-input-xiaozhi"><i class="fa fa-plug"></i> Cấu hình Xiaozhi</label>
     <input type="text" id="node-input-xiaozhi">
   </div>
 
   <div class="form-row">
-    <label for="node-input-messageMode"><i class="fa fa-exchange"></i> 消息模式</label>
+    <label for="node-input-messageMode"><i class="fa fa-exchange"></i> Chế độ tin nhắn</label>
     <select id="node-input-messageMode">
-      <option value="send">仅发送</option>
-      <option value="receive">仅接收</option>
-      <option value="bidirectional">双向处理</option>
+      <option value="send">Chỉ gửi</option>
+      <option value="receive">Chỉ nhận</option>
+      <option value="bidirectional">Xử lý hai chiều</option>
     </select>
   </div>
 
   <div id="send-options">
     <div class="form-row">
-      <label for="node-input-messageType"><i class="fa fa-envelope"></i> 消息类型</label>
+      <label for="node-input-messageType"><i class="fa fa-envelope"></i> Loại tin nhắn</label>
       <select id="node-input-messageType">
-        <option value="notification">通知</option>
-        <option value="request">请求</option>
-        <option value="response">响应</option>
+        <option value="notification">Thông báo</option>
+        <option value="request">Yêu cầu</option>
+        <option value="response">Phản hồi</option>
       </select>
     </div>
 
     <div class="form-row">
-      <label for="node-input-method"><i class="fa fa-code"></i> 方法名称</label>
+      <label for="node-input-method"><i class="fa fa-code"></i> Tên phương thức</label>
       <input type="text" id="node-input-method" placeholder="ping">
       <select id="method-template" style="width: 120px; margin-left: 10px;">
-        <option value="">模板...</option>
+        <option value="">Mẫu...</option>
         <option value="ping">ping</option>
         <option value="tools/list">tools/list</option>
         <option value="tools/call">tools/call</option>
@@ -200,22 +200,22 @@ xiaozhi-message 消息处理节点
     </div>
 
     <div class="form-row">
-      <label for="node-input-paramsSource"><i class="fa fa-code"></i> 参数来源</label>
+      <label for="node-input-paramsSource"><i class="fa fa-code"></i> Nguồn tham số</label>
       <select id="node-input-paramsSource">
-        <option value="configured">配置的参数</option>
+        <option value="configured">Tham số cấu hình</option>
         <option value="msg">msg.payload</option>
         <option value="msg.params">msg.params</option>
-        <option value="flow">Flow上下文</option>
-        <option value="global">Global上下文</option>
+        <option value="flow">Ngữ cảnh Flow</option>
+        <option value="global">Ngữ cảnh Global</option>
       </select>
     </div>
 
     <div id="params-editor-container">
       <div class="form-row">
-        <label for="node-input-params-editor">消息参数</label>
+        <label for="node-input-params-editor">Tham số tin nhắn</label>
         <div style="height: 150px;" class="node-text-editor" id="node-input-params-editor"></div>
         <div id="params-valid" style="display:none; color: green;">
-          <i class="fa fa-check"></i> 参数格式正确
+          <i class="fa fa-check"></i> Định dạng tham số chính xác
         </div>
         <div id="params-error" style="display:none; color: red;">
           <i class="fa fa-exclamation-triangle"></i> <span></span>
@@ -228,81 +228,81 @@ xiaozhi-message 消息处理节点
     <div class="form-row">
       <label>&nbsp;</label>
       <input type="checkbox" id="node-input-filterIncoming" style="width:auto;">
-      <label for="node-input-filterIncoming" style="width:70%;">启用消息过滤</label>
+      <label for="node-input-filterIncoming" style="width:70%;">Bật lọc tin nhắn</label>
     </div>
 
     <div class="form-row">
-      <label for="node-input-methodFilter"><i class="fa fa-filter"></i> 方法过滤器</label>
+      <label for="node-input-methodFilter"><i class="fa fa-filter"></i> Bộ lọc phương thức</label>
       <input type="text" id="node-input-methodFilter" placeholder="ping,tools/*">
     </div>
   </div>
 
   <div class="form-row">
-    <label for="node-input-outputFormat"><i class="fa fa-share"></i> 输出格式</label>
+    <label for="node-input-outputFormat"><i class="fa fa-share"></i> Định dạng đầu ra</label>
     <select id="node-input-outputFormat">
-      <option value="payload">提取数据</option>
-      <option value="full">完整对象</option>
-      <option value="jsonrpc">原始消息</option>
+      <option value="payload">Trích xuất dữ liệu</option>
+      <option value="full">Đối tượng đầy đủ</option>
+      <option value="jsonrpc">Tin nhắn gốc</option>
     </select>
   </div>
 
   <div class="form-row">
     <label>&nbsp;</label>
     <input type="checkbox" id="node-input-enableLogging" style="width:auto;">
-    <label for="node-input-enableLogging" style="width:70%;">启用消息日志记录</label>
+    <label for="node-input-enableLogging" style="width:70%;">Bật ghi nhật ký tin nhắn</label>
   </div>
 
   <div class="form-row">
     <label>&nbsp;</label>
     <button type="button" id="test-send" class="red-ui-button">
-      <i class="fa fa-paper-plane"></i> 测试发送
+      <i class="fa fa-paper-plane"></i> Kiểm tra gửi
     </button>
   </div>
 </script>
 
 <script type="text/html" data-help-name="xiaozhi-message">
-  <p>xiaozhi-message节点用于处理MCP消息的发送、接收和格式化，支持JSON-RPC 2.0协议。</p>
+  <p>Nút xiaozhi-message dùng để xử lý việc gửi, nhận và định dạng tin nhắn MCP, hỗ trợ giao thức JSON-RPC 2.0.</p>
 
-  <h3>配置说明</h3>
+  <h3>Mô tả cấu hình</h3>
   <dl class="message-properties">
-    <dt>消息模式</dt>
-    <dd>仅发送：只发送消息到MCP服务器</dd>
-    <dd>仅接收：只接收来自MCP服务器的消息</dd>
-    <dd>双向处理：可发送和接收消息</dd>
+    <dt>Chế độ tin nhắn</dt>
+    <dd>Chỉ gửi: Chỉ gửi tin nhắn đến máy chủ MCP</dd>
+    <dd>Chỉ nhận: Chỉ nhận tin nhắn từ máy chủ MCP</dd>
+    <dd>Xử lý hai chiều: Có thể gửi và nhận tin nhắn</dd>
 
-    <dt>消息类型</dt>
-    <dd>通知：单向发送，无需响应</dd>
-    <dd>请求：需要响应，包含消息ID</dd>
-    <dd>响应：回复其他请求</dd>
+    <dt>Loại tin nhắn</dt>
+    <dd>Thông báo: Gửi một chiều, không cần phản hồi</dd>
+    <dd>Yêu cầu: Cần phản hồi, bao gồm ID tin nhắn</dd>
+    <dd>Phản hồi: Trả lời các yêu cầu khác</dd>
 
-    <dt>参数来源</dt>
-    <dd>配置的参数：使用下方编辑器中的固定参数</dd>
-    <dd>msg.payload：使用输入消息的payload</dd>
-    <dd>其他：使用指定的消息属性或上下文</dd>
+    <dt>Nguồn tham số</dt>
+    <dd>Tham số cấu hình: Sử dụng tham số cố định trong trình chỉnh sửa bên dưới</dd>
+    <dd>msg.payload: Sử dụng payload của tin nhắn đầu vào</dd>
+    <dd>Khác: Sử dụng thuộc tính tin nhắn hoặc ngữ cảnh được chỉ định</dd>
   </dl>
 
-  <h3>支持的MCP方法</h3>
+  <h3>Các phương thức MCP được hỗ trợ</h3>
   <ul>
-    <li>ping - 心跳检测</li>
-    <li>initialize - 初始化连接</li>
-    <li>tools/list - 获取工具列表</li>
-    <li>tools/call - 调用工具</li>
-    <li>自定义方法</li>
+    <li>ping - Kiểm tra nhịp tim</li>
+    <li>initialize - Khởi tạo kết nối</li>
+    <li>tools/list - Lấy danh sách công cụ</li>
+    <li>tools/call - Gọi công cụ</li>
+    <li>Phương thức tùy chỉnh</li>
   </ul>
 
-  <h3>使用示例</h3>
-  <p><strong>发送ping消息：</strong></p>
+  <h3>Ví dụ sử dụng</h3>
+  <p><strong>Gửi tin nhắn ping：</strong></p>
   <ol>
-    <li>消息模式：仅发送</li>
-    <li>消息类型：通知</li>
-    <li>方法名称：ping</li>
-    <li>参数：{}</li>
+    <li>Chế độ tin nhắn：Chỉ gửi</li>
+    <li>Loại tin nhắn：Thông báo</li>
+    <li>Tên phương thức：ping</li>
+    <li>Tham số：{}</li>
   </ol>
 
-  <p><strong>接收工具调用：</strong></p>
+  <p><strong>Nhận lời gọi công cụ：</strong></p>
   <ol>
-    <li>消息模式：仅接收</li>
-    <li>启用消息过滤</li>
-    <li>方法过滤器：tools/*</li>
+    <li>Chế độ tin nhắn：Chỉ nhận</li>
+    <li>Bật lọc tin nhắn</li>
+    <li>Bộ lọc phương thức：tools/*</li>
   </ol>
 </script>

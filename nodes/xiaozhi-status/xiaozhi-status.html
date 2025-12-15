@@ -1,11 +1,11 @@
 <!--
-xiaozhi-status 状态监控节点
-用于监控MCP连接状态、工具状态和系统健康状况
+xiaozhi-status Trạng thái giám sát nút
+Dùng để giám sát trạng thái kết nối MCP, trạng thái công cụ và tình trạng sức khỏe hệ thống
 -->
 
 <script type="text/javascript">
   RED.nodes.registerType('xiaozhi-status', {
-    category: '小智MCP',
+    category: 'Xiaozhi MCP',
     color: '#FFE4B5',
     defaults: {
       name: { value: '' },
@@ -20,29 +20,29 @@ xiaozhi-status 状态监控节点
     },
     inputs: 1,
     outputs: 1,
-    inputLabels: '控制命令',
-    outputLabels: '状态信息',
+    inputLabels: 'Lệnh điều khiển',
+    outputLabels: 'Thông tin trạng thái',
     icon: 'font-awesome/fa-heartbeat',
     label: function() {
-      return this.name || '状态监控';
+      return this.name || 'Giám sát trạng thái';
     },
     labelStyle: function() {
       return this.name ? 'node_label_italic' : '';
     },
-    paletteLabel: '状态监控',
+    paletteLabel: 'Giám sát trạng thái',
     oneditprepare: function() {
       var node = this;
       
-      // 监控模式变化处理
+      // Xử lý thay đổi chế độ giám sát
       $('#node-input-monitorMode').on('change', function() {
         var mode = $(this).val();
         var intervalContainer = $('#polling-interval-container');
         var modeHelp = $('#monitor-mode-help');
         
         var helpTexts = {
-          'auto': '自动监控：启动时开始监控，定期检查状态变化',
-          'manual': '手动监控：仅响应输入消息触发状态检查',
-          'scheduled': '定时监控：按指定间隔定期输出状态信息'
+          'auto': 'Giám sát tự động: Bắt đầu giám sát khi khởi động, kiểm tra trạng thái thay đổi định kỳ',
+          'manual': 'Giám sát thủ công: Chỉ kiểm tra trạng thái khi có thông điệp đầu vào kích hoạt',
+          'scheduled': 'Giám sát theo lịch: Xuất thông tin trạng thái định kỳ theo khoảng thời gian chỉ định'
         };
         
         modeHelp.text(helpTexts[mode] || '');
@@ -54,18 +54,18 @@ xiaozhi-status 状态监控节点
         }
       });
 
-      // 输出模式变化处理
+      // Xử lý thay đổi chế độ xuất
       $('#node-input-outputMode').on('change', function() {
         var mode = $(this).val();
         var helpTexts = {
-          'full': '输出完整的状态信息，包括所有配置的监控项',
-          'changes': '仅在状态发生变化时输出，包含变化详情',
-          'summary': '输出简化的状态摘要信息'
+          'full': 'Xuất thông tin trạng thái đầy đủ, bao gồm tất cả các mục giám sát được cấu hình',
+          'changes': 'Chỉ xuất khi trạng thái thay đổi, bao gồm chi tiết thay đổi',
+          'summary': 'Xuất thông tin tóm tắt trạng thái đơn giản'
         };
         $('#output-mode-help').text(helpTexts[mode] || '');
       });
 
-      // 轮询间隔单位转换
+      // Chuyển đổi đơn vị khoảng thời gian kiểm tra
       $('#polling-unit').on('change', function() {
         var unit = $(this).val();
         var intervalField = $('#node-input-pollingInterval');
@@ -79,23 +79,23 @@ xiaozhi-status 状态监控节点
             intervalField.val(Math.round(currentValue / 60000));
             break;
           default: // milliseconds
-            // 保持原值
+            // Giữ nguyên giá trị
             break;
         }
       });
 
-      // 实时状态查看
+      // Xem trạng thái thời gian thực
       var statusDisplay = $('#status-display');
       var refreshStatusBtn = $('#refresh-status');
       var monitoringStats = $('#monitoring-stats');
 
       var updateStatusDisplay = function() {
         if (!node.id) {
-          statusDisplay.html('<p class="status-item">请先保存节点配置</p>');
+          statusDisplay.html('<p class="status-item">Vui lòng lưu cấu hình nút trước</p>');
           return;
         }
 
-        refreshStatusBtn.prop('disabled', true).text('获取中...');
+        refreshStatusBtn.prop('disabled', true).text('Đang lấy...');
 
         $.ajax({
           url: 'xiaozhi-status/' + node.id + '/status',
@@ -103,28 +103,28 @@ xiaozhi-status 状态监控节点
           success: function(data) {
             var html = '<div class="status-container">';
             
-            // MCP连接状态
+            // Trạng thái kết nối MCP
             html += '<div class="status-section">';
-            html += '<h4><i class="fa fa-plug"></i> MCP连接</h4>';
-            html += '<div class="status-item">状态: <span class="status-value ' + 
+            html += '<h4><i class="fa fa-plug"></i> Kết nối MCP</h4>';
+            html += '<div class="status-item">Trạng thái: <span class="status-value ' + 
                    (data.mcp.connected ? 'connected' : 'disconnected') + '">' +
-                   (data.mcp.connected ? '已连接' : '未连接') + '</span></div>';
-            html += '<div class="status-item">端点: <span class="status-value">' + 
-                   (data.mcp.endpoint || '未配置') + '</span></div>';
+                   (data.mcp.connected ? 'Đã kết nối' : 'Chưa kết nối') + '</span></div>';
+            html += '<div class="status-item">Điểm cuối: <span class="status-value">' + 
+                   (data.mcp.endpoint || 'Chưa cấu hình') + '</span></div>';
             if (data.mcp.lastError) {
-              html += '<div class="status-item">错误: <span class="status-value error">' + 
+              html += '<div class="status-item">Lỗi: <span class="status-value error">' + 
                      data.mcp.lastError + '</span></div>';
             }
             html += '</div>';
 
-            // 工具信息
+            // Thông tin công cụ
             if (data.tools) {
               html += '<div class="status-section">';
-              html += '<h4><i class="fa fa-cogs"></i> 注册工具</h4>';
-              html += '<div class="status-item">数量: <span class="status-value">' + 
+              html += '<h4><i class="fa fa-cogs"></i> Công cụ đã đăng ký</h4>';
+              html += '<div class="status-item">Số lượng: <span class="status-value">' + 
                      data.tools.count + '</span></div>';
               if (data.tools.names && data.tools.names.length > 0) {
-                html += '<div class="status-item">工具列表:</div>';
+                html += '<div class="status-item">Danh sách công cụ:</div>';
                 html += '<ul class="tool-list">';
                 data.tools.names.forEach(function(name) {
                   html += '<li>' + name + '</li>';
@@ -134,14 +134,14 @@ xiaozhi-status 状态监控节点
               html += '</div>';
             }
 
-            // 健康状态
+            // Trạng thái sức khỏe
             if (data.mcp.health) {
               html += '<div class="status-section">';
-              html += '<h4><i class="fa fa-heartbeat"></i> 健康状态</h4>';
-              html += '<div class="status-item">状态: <span class="status-value ' + 
+              html += '<h4><i class="fa fa-heartbeat"></i> Trạng thái sức khỏe</h4>';
+              html += '<div class="status-item">Trạng thái: <span class="status-value ' + 
                      data.mcp.health.status + '">' + data.mcp.health.status + '</span></div>';
               if (data.mcp.health.reason) {
-                html += '<div class="status-item">原因: <span class="status-value">' + 
+                html += '<div class="status-item">Lý do: <span class="status-value">' + 
                        data.mcp.health.reason + '</span></div>';
               }
               html += '</div>';
@@ -151,10 +151,10 @@ xiaozhi-status 状态监控节点
             statusDisplay.html(html);
           },
           error: function() {
-            statusDisplay.html('<p class="status-item error">无法获取状态信息</p>');
+            statusDisplay.html('<p class="status-item error">Không thể lấy thông tin trạng thái</p>');
           },
           complete: function() {
-            refreshStatusBtn.prop('disabled', false).text('刷新状态');
+            refreshStatusBtn.prop('disabled', false).text('Làm mới trạng thái');
           }
         });
       };
@@ -167,36 +167,36 @@ xiaozhi-status 状态监控节点
           method: 'GET',
           success: function(data) {
             var html = '<div class="stats-container">';
-            html += '<div class="stats-item">监控状态: <span class="' + 
+            html += '<div class="stats-item">Trạng thái giám sát: <span class="' + 
                    (data.monitoring ? 'monitoring' : 'stopped') + '">' +
-                   (data.monitoring ? '监控中' : '已停止') + '</span></div>';
-            html += '<div class="stats-item">轮询间隔: ' + data.pollingInterval + 'ms</div>';
-            html += '<div class="stats-item">总输出: ' + data.totalOutputs + '次</div>';
-            html += '<div class="stats-item">状态变化: ' + data.statusChanges + '次</div>';
-            html += '<div class="stats-item">连接变化: ' + data.connectionChanges + '次</div>';
+                   (data.monitoring ? 'Đang giám sát' : 'Đã dừng') + '</span></div>';
+            html += '<div class="stats-item">Khoảng thời gian kiểm tra: ' + data.pollingInterval + 'ms</div>';
+            html += '<div class="stats-item">Tổng số lần xuất: ' + data.totalOutputs + ' lần</div>';
+            html += '<div class="stats-item">Thay đổi trạng thái: ' + data.statusChanges + ' lần</div>';
+            html += '<div class="stats-item">Thay đổi kết nối: ' + data.connectionChanges + ' lần</div>';
             if (data.startedAt) {
-              html += '<div class="stats-item">运行时间: ' + 
-                     Math.round(data.uptime / 1000) + '秒</div>';
+              html += '<div class="stats-item">Thời gian chạy: ' + 
+                     Math.round(data.uptime / 1000) + ' giây</div>';
             }
             html += '</div>';
             monitoringStats.html(html);
           },
           error: function() {
-            monitoringStats.html('<p class="error">无法获取统计信息</p>');
+            monitoringStats.html('<p class="error">Không thể lấy thông tin thống kê</p>');
           }
         });
       };
 
-      // 刷新按钮事件
+      // Sự kiện nút làm mới
       refreshStatusBtn.on('click', function() {
         updateStatusDisplay();
         updateMonitoringStats();
       });
 
-      // 监控控制按钮
+      // Nút điều khiển giám sát
       $('#start-monitoring').on('click', function() {
         if (!node.id) {
-          RED.notify('请先保存节点配置', 'warn');
+          RED.notify('Vui lòng lưu cấu hình nút trước', 'warn');
           return;
         }
 
@@ -209,11 +209,11 @@ xiaozhi-status 状态监控节点
           contentType: 'application/json',
           data: JSON.stringify({ action: 'start' }),
           success: function(data) {
-            RED.notify('监控已启动', 'success');
+            RED.notify('Đã bắt đầu giám sát', 'success');
             updateMonitoringStats();
           },
           error: function() {
-            RED.notify('启动监控失败', 'error');
+            RED.notify('Không thể bắt đầu giám sát', 'error');
           },
           complete: function() {
             button.prop('disabled', false);
@@ -223,7 +223,7 @@ xiaozhi-status 状态监控节点
 
       $('#stop-monitoring').on('click', function() {
         if (!node.id) {
-          RED.notify('请先保存节点配置', 'warn');
+          RED.notify('Vui lòng lưu cấu hình nút trước', 'warn');
           return;
         }
 
@@ -236,11 +236,11 @@ xiaozhi-status 状态监控节点
           contentType: 'application/json',
           data: JSON.stringify({ action: 'stop' }),
           success: function(data) {
-            RED.notify('监控已停止', 'success');
+            RED.notify('Đã dừng giám sát', 'success');
             updateMonitoringStats();
           },
           error: function() {
-            RED.notify('停止监控失败', 'error');
+            RED.notify('Không thể dừng giám sát', 'error');
           },
           complete: function() {
             button.prop('disabled', false);
@@ -248,10 +248,10 @@ xiaozhi-status 状态监控节点
         });
       });
 
-      // 查看历史按钮
+      // Nút xem lịch sử
       $('#view-history').on('click', function() {
         if (!node.id) {
-          RED.notify('请先保存节点配置', 'warn');
+          RED.notify('Vui lòng lưu cấu hình nút trước', 'warn');
           return;
         }
 
@@ -259,29 +259,29 @@ xiaozhi-status 状态监控节点
           url: 'xiaozhi-status/' + node.id + '/history?limit=10',
           method: 'GET',
           success: function(data) {
-            var historyText = '最近10条状态历史:\n\n';
+            var historyText = 'Lịch sử trạng thái gần đây (10 mục):\n\n';
             data.forEach(function(item, index) {
               historyText += (index + 1) + '. ' + new Date(item.timestamp).toLocaleString();
               if (item.changes && item.changes.length > 0) {
-                historyText += ' - 变化: ' + item.changes.join(', ');
+                historyText += ' - Thay đổi: ' + item.changes.join(', ');
               }
               historyText += '\n';
             });
             RED.notify(historyText, 'success');
           },
           error: function() {
-            RED.notify('获取历史记录失败', 'error');
+            RED.notify('Không thể lấy lịch sử', 'error');
           }
         });
       });
 
-      // 帮助信息切换
+      // Chuyển đổi thông tin trợ giúp
       $('.help-toggle').on('click', function() {
         var target = $(this).data('target');
         $(target).toggle();
       });
 
-      // 初始化
+      // Khởi tạo
       setTimeout(function() {
         $('#node-input-monitorMode').trigger('change');
         $('#node-input-outputMode').trigger('change');
@@ -290,7 +290,7 @@ xiaozhi-status 状态监控节点
       }, 100);
     },
     oneditsave: function() {
-      // 转换轮询间隔单位
+      // Chuyển đổi đơn vị khoảng thời gian kiểm tra
       var unit = $('#polling-unit').val();
       var interval = parseInt($('#node-input-pollingInterval').val()) || 10;
       
@@ -311,67 +311,67 @@ xiaozhi-status 状态监控节点
 
 <script type="text/html" data-template-name="xiaozhi-status">
   <div class="form-row">
-    <label for="node-input-name"><i class="fa fa-tag"></i> 节点名称</label>
-    <input type="text" id="node-input-name" placeholder="可选的节点名称">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Tên nút</label>
+    <input type="text" id="node-input-name" placeholder="Tên nút tùy chọn">
   </div>
 
   <div class="form-row">
-    <label for="node-input-xiaozhi"><i class="fa fa-plug"></i> 小智配置</label>
+    <label for="node-input-xiaozhi"><i class="fa fa-plug"></i> Cấu hình Xiaozhi</label>
     <input type="text" id="node-input-xiaozhi">
   </div>
 
   <hr>
 
   <div class="form-row">
-    <label for="node-input-monitorMode"><i class="fa fa-eye"></i> 监控模式</label>
+    <label for="node-input-monitorMode"><i class="fa fa-eye"></i> Chế độ giám sát</label>
     <select id="node-input-monitorMode">
-      <option value="auto">自动监控</option>
-      <option value="manual">手动监控</option>
-      <option value="scheduled">定时监控</option>
+      <option value="auto">Giám sát tự động</option>
+      <option value="manual">Giám sát thủ công</option>
+      <option value="scheduled">Giám sát theo lịch</option>
     </select>
     <div class="red-ui-help">
-      <p id="monitor-mode-help">自动监控：启动时开始监控，定期检查状态变化</p>
+      <p id="monitor-mode-help">Giám sát tự động: Bắt đầu giám sát khi khởi động, kiểm tra trạng thái thay đổi định kỳ</p>
     </div>
   </div>
 
   <div id="polling-interval-container" class="form-row">
-    <label for="node-input-pollingInterval"><i class="fa fa-clock-o"></i> 轮询间隔</label>
+    <label for="node-input-pollingInterval"><i class="fa fa-clock-o"></i> Khoảng thời gian kiểm tra</label>
     <input type="number" id="node-input-pollingInterval" style="width: 60px;" min="1" step="1" value="10">
     <select id="polling-unit" style="width: 80px; margin-left: 5px;">
-      <option value="milliseconds">毫秒</option>
-      <option value="seconds" selected>秒</option>
-      <option value="minutes">分钟</option>
+      <option value="milliseconds">Miligiây</option>
+      <option value="seconds" selected>Giây</option>
+      <option value="minutes">Phút</option>
     </select>
   </div>
 
   <div class="form-row">
-    <label for="node-input-outputMode"><i class="fa fa-share"></i> 输出模式</label>
+    <label for="node-input-outputMode"><i class="fa fa-share"></i> Chế độ xuất</label>
     <select id="node-input-outputMode">
-      <option value="full">完整信息</option>
-      <option value="changes">仅变化</option>
-      <option value="summary">简要摘要</option>
+      <option value="full">Thông tin đầy đủ</option>
+      <option value="changes">Chỉ thay đổi</option>
+      <option value="summary">Tóm tắt ngắn gọn</option>
     </select>
     <div class="red-ui-help">
-      <p id="output-mode-help">输出完整的状态信息，包括所有配置的监控项</p>
+      <p id="output-mode-help">Xuất thông tin trạng thái đầy đủ, bao gồm tất cả các mục giám sát được cấu hình</p>
     </div>
   </div>
 
   <hr>
 
   <div class="form-row">
-    <label>监控项目</label>
+    <label>Mục giám sát</label>
     <div style="margin-left: 105px;">
       <label style="width: auto;">
         <input type="checkbox" id="node-input-includeStats" style="width: auto; margin-right: 5px;">
-        包含统计信息
+        Bao gồm thông tin thống kê
       </label><br>
       <label style="width: auto;">
         <input type="checkbox" id="node-input-includeHealth" style="width: auto; margin-right: 5px;">
-        包含健康状态
+        Bao gồm trạng thái sức khỏe
       </label><br>
       <label style="width: auto;">
         <input type="checkbox" id="node-input-includeTools" style="width: auto; margin-right: 5px;">
-        包含工具信息
+        Bao gồm thông tin công cụ
       </label>
     </div>
   </div>
@@ -379,36 +379,36 @@ xiaozhi-status 状态监控节点
   <div class="form-row">
     <label>&nbsp;</label>
     <input type="checkbox" id="node-input-autoStart" style="display:inline-block; width:auto; vertical-align:top;">
-    <label for="node-input-autoStart" style="width:70%;">启动时自动开始监控</label>
+    <label for="node-input-autoStart" style="width:70%;">Tự động bắt đầu giám sát khi khởi động</label>
   </div>
 
   <hr>
 
   <div class="form-row">
-    <label>实时状态</label>
+    <label>Trạng thái thời gian thực</label>
     <button type="button" id="refresh-status" class="red-ui-button" style="margin-left: 10px;">
-      <i class="fa fa-refresh"></i> 刷新状态
+      <i class="fa fa-refresh"></i> Làm mới trạng thái
     </button>
     <button type="button" class="help-toggle red-ui-button" data-target="#commands-help" style="margin-left: 5px;">
-      <i class="fa fa-question-circle"></i> 控制命令
+      <i class="fa fa-question-circle"></i> Lệnh điều khiển
     </button>
   </div>
 
   <div id="status-display" class="status-display">
-    <p class="status-item">点击刷新状态按钮获取实时信息</p>
+    <p class="status-item">Nhấn nút làm mới trạng thái để lấy thông tin thời gian thực</p>
   </div>
 
   <div id="commands-help" class="red-ui-help" style="display:none;">
-    <h4>输入控制命令</h4>
-    <p>发送以下字符串到输入端口控制监控行为：</p>
+    <h4>Lệnh điều khiển đầu vào</h4>
+    <p>Gửi các chuỗi sau đến cổng đầu vào để điều khiển hành vi giám sát:</p>
     <ul>
-      <li><code>"start"</code> - 开始监控</li>
-      <li><code>"stop"</code> - 停止监控</li>
-      <li><code>"check"</code> 或 <code>"status"</code> - 立即检查状态</li>
-      <li><code>"stats"</code> - 输出监控统计信息</li>
-      <li><code>"history"</code> - 输出状态历史记录</li>
+      <li><code>"start"</code> - Bắt đầu giám sát</li>
+      <li><code>"stop"</code> - Dừng giám sát</li>
+      <li><code>"check"</code> hoặc <code>"status"</code> - Kiểm tra trạng thái ngay lập tức</li>
+      <li><code>"stats"</code> - Xuất thông tin thống kê giám sát</li>
+      <li><code>"history"</code> - Xuất lịch sử trạng thái</li>
     </ul>
-    <p>也可以发送对象命令：</p>
+    <p>Cũng có thể gửi lệnh đối tượng:</p>
     <pre>
 {
   "action": "configure",
@@ -419,153 +419,153 @@ xiaozhi-status 状态监控节点
   </div>
 
   <div class="form-row">
-    <label>监控控制</label>
+    <label>Điều khiển giám sát</label>
     <button type="button" id="start-monitoring" class="red-ui-button">
-      <i class="fa fa-play"></i> 启动监控
+      <i class="fa fa-play"></i> Bắt đầu giám sát
     </button>
     <button type="button" id="stop-monitoring" class="red-ui-button" style="margin-left: 5px;">
-      <i class="fa fa-stop"></i> 停止监控
+      <i class="fa fa-stop"></i> Dừng giám sát
     </button>
     <button type="button" id="view-history" class="red-ui-button" style="margin-left: 10px;">
-      <i class="fa fa-history"></i> 查看历史
+      <i class="fa fa-history"></i> Xem lịch sử
     </button>
   </div>
 
   <div id="monitoring-stats" class="status-display">
-    <p class="status-item">监控统计信息将在此显示</p>
+    <p class="status-item">Thông tin thống kê giám sát sẽ hiển thị ở đây</p>
   </div>
 </script>
 
 <script type="text/html" data-help-name="xiaozhi-status">
-  <p>xiaozhi-status节点用于监控小智MCP连接状态、工具状态和系统健康状况，提供实时的状态信息。</p>
+  <p>Nút xiaozhi-status dùng để giám sát trạng thái kết nối MCP Xiaozhi, trạng thái công cụ và tình trạng sức khỏe hệ thống, cung cấp thông tin trạng thái thời gian thực.</p>
 
-  <h3>配置说明</h3>
+  <h3>Hướng dẫn cấu hình</h3>
   <dl class="message-properties">
-    <dt>小智配置 <span class="property-type">xiaozhi-config</span></dt>
-    <dd>选择要监控的小智MCP连接节点</dd>
+    <dt>Cấu hình Xiaozhi <span class="property-type">xiaozhi-config</span></dt>
+    <dd>Chọn nút kết nối MCP Xiaozhi cần giám sát</dd>
 
-    <dt>监控模式 <span class="property-type">string</span></dt>
-    <dd>监控行为模式：自动监控、手动监控或定时监控</dd>
+    <dt>Chế độ giám sát <span class="property-type">string</span></dt>
+    <dd>Chế độ hành vi giám sát: Giám sát tự động, giám sát thủ công hoặc giám sát theo lịch</dd>
 
-    <dt>轮询间隔 <span class="property-type">number</span></dt>
-    <dd>在自动或定时模式下的状态检查间隔</dd>
+    <dt>Khoảng thời gian kiểm tra <span class="property-type">number</span></dt>
+    <dd>Khoảng thời gian kiểm tra trạng thái trong chế độ tự động hoặc theo lịch</dd>
 
-    <dt>输出模式 <span class="property-type">string</span></dt>
-    <dd>状态信息的输出格式：完整信息、仅变化或简要摘要</dd>
+    <dt>Chế độ xuất <span class="property-type">string</span></dt>
+    <dd>Định dạng xuất thông tin trạng thái: Thông tin đầy đủ, chỉ thay đổi hoặc tóm tắt ngắn gọn</dd>
 
-    <dt>监控项目 <span class="property-type">boolean</span></dt>
-    <dd>选择要包含在状态信息中的项目</dd>
+    <dt>Mục giám sát <span class="property-type">boolean</span></dt>
+    <dd>Chọn các mục cần bao gồm trong thông tin trạng thái</dd>
   </dl>
 
-  <h3>输入消息</h3>
-  <p>接收控制命令：</p>
+  <h3>Thông điệp đầu vào</h3>
+  <p>Nhận lệnh điều khiển:</p>
   <dl class="message-properties">
     <dt>payload <span class="property-type">string | object</span></dt>
-    <dd>控制命令字符串或配置对象</dd>
+    <dd>Chuỗi lệnh điều khiển hoặc đối tượng cấu hình</dd>
   </dl>
 
-  <h4>支持的命令</h4>
+  <h4>Các lệnh được hỗ trợ</h4>
   <ul>
-    <li><code>"start"</code> - 开始监控</li>
-    <li><code>"stop"</code> - 停止监控</li>
-    <li><code>"check"</code> - 立即检查状态</li>
-    <li><code>"stats"</code> - 输出统计信息</li>
-    <li><code>"history"</code> - 输出历史记录</li>
+    <li><code>"start"</code> - Bắt đầu giám sát</li>
+    <li><code>"stop"</code> - Dừng giám sát</li>
+    <li><code>"check"</code> - Kiểm tra trạng thái ngay lập tức</li>
+    <li><code>"stats"</code> - Xuất thông tin thống kê</li>
+    <li><code>"history"</code> - Xuất lịch sử</li>
   </ul>
 
-  <h3>输出消息</h3>
-  <h4>完整信息模式</h4>
+  <h3>Thông điệp đầu ra</h3>
+  <h4>Chế độ thông tin đầy đủ</h4>
   <dl class="message-properties">
     <dt>payload.timestamp <span class="property-type">string</span></dt>
-    <dd>状态检查的时间戳</dd>
+    <dd>Dấu thời gian kiểm tra trạng thái</dd>
 
     <dt>payload.mcp <span class="property-type">object</span></dt>
-    <dd>MCP连接状态信息</dd>
+    <dd>Thông tin trạng thái kết nối MCP</dd>
 
     <dt>payload.tools <span class="property-type">object</span></dt>
-    <dd>注册工具的信息</dd>
+    <dd>Thông tin công cụ đã đăng ký</dd>
 
     <dt>payload.system <span class="property-type">object</span></dt>
-    <dd>系统和监控信息</dd>
+    <dd>Thông tin hệ thống và giám sát</dd>
 
     <dt>_statusUpdate <span class="property-type">object</span></dt>
-    <dd>状态更新的元信息</dd>
+    <dd>Thông tin meta cập nhật trạng thái</dd>
   </dl>
 
-  <h4>仅变化模式</h4>
-  <p>仅在状态发生变化时输出，包含额外字段：</p>
+  <h4>Chế độ chỉ thay đổi</h4>
+  <p>Chỉ xuất khi trạng thái thay đổi, bao gồm các trường bổ sung:</p>
   <dl class="message-properties">
     <dt>payload.changes <span class="property-type">array</span></dt>
-    <dd>发生的变化列表</dd>
+    <dd>Danh sách các thay đổi đã xảy ra</dd>
 
     <dt>payload.previousStatus <span class="property-type">object</span></dt>
-    <dd>前一次的状态信息</dd>
+    <dd>Thông tin trạng thái trước đó</dd>
   </dl>
 
-  <h3>MCP状态信息</h3>
+  <h3>Thông tin trạng thái MCP</h3>
   <dl class="message-properties">
     <dt>mcp.connected <span class="property-type">boolean</span></dt>
-    <dd>MCP服务器连接状态</dd>
+    <dd>Trạng thái kết nối máy chủ MCP</dd>
 
     <dt>mcp.connectionState <span class="property-type">string</span></dt>
-    <dd>详细的连接状态</dd>
+    <dd>Trạng thái kết nối chi tiết</dd>
 
     <dt>mcp.endpoint <span class="property-type">string</span></dt>
-    <dd>MCP服务器端点地址</dd>
+    <dd>Địa chỉ điểm cuối máy chủ MCP</dd>
 
     <dt>mcp.health <span class="property-type">object</span></dt>
-    <dd>连接健康状态</dd>
+    <dd>Trạng thái sức khỏe kết nối</dd>
 
     <dt>mcp.stats <span class="property-type">object</span></dt>
-    <dd>连接统计信息</dd>
+    <dd>Thông tin thống kê kết nối</dd>
   </dl>
 
-  <h3>工具状态信息</h3>
+  <h3>Thông tin trạng thái công cụ</h3>
   <dl class="message-properties">
     <dt>tools.count <span class="property-type">number</span></dt>
-    <dd>已注册工具的数量</dd>
+    <dd>Số lượng công cụ đã đăng ký</dd>
 
     <dt>tools.names <span class="property-type">array</span></dt>
-    <dd>工具名称列表</dd>
+    <dd>Danh sách tên công cụ</dd>
 
     <dt>tools.details <span class="property-type">array</span></dt>
-    <dd>工具详细信息（包含统计时）</dd>
+    <dd>Thông tin chi tiết công cụ (khi bao gồm thống kê)</dd>
   </dl>
 
-  <h3>使用示例</h3>
-  <p><strong>基础监控设置</strong></p>
+  <h3>Ví dụ sử dụng</h3>
+  <p><strong>Thiết lập giám sát cơ bản</strong></p>
   <ol>
-    <li>选择小智配置节点</li>
-    <li>设置监控模式为"自动监控"</li>
-    <li>设置轮询间隔为10秒</li>
-    <li>选择输出模式为"仅变化"</li>
-    <li>启用所有监控项目</li>
+    <li>Chọn nút cấu hình Xiaozhi</li>
+    <li>Đặt chế độ giám sát thành "Giám sát tự động"</li>
+    <li>Đặt khoảng thời gian kiểm tra là 10 giây</li>
+    <li>Chọn chế độ xuất là "Chỉ thay đổi"</li>
+    <li>Kích hoạt tất cả các mục giám sát</li>
   </ol>
 
-  <p><strong>手动控制监控</strong></p>
+  <p><strong>Điều khiển giám sát thủ công</strong></p>
   <ol>
-    <li>设置监控模式为"手动监控"</li>
-    <li>连接inject节点，发送"start"命令开始监控</li>
-    <li>发送"check"命令手动检查状态</li>
-    <li>发送"stop"命令停止监控</li>
+    <li>Đặt chế độ giám sát thành "Giám sát thủ công"</li>
+    <li>Kết nối nút inject, gửi lệnh "start" để bắt đầu giám sát</li>
+    <li>Gửi lệnh "check" để kiểm tra trạng thái thủ công</li>
+    <li>Gửi lệnh "stop" để dừng giám sát</li>
   </ol>
 
-  <h3>状态变化事件</h3>
-  <p>节点会检测并报告以下状态变化：</p>
+  <h3>Sự kiện thay đổi trạng thái</h3>
+  <p>Nút sẽ phát hiện và báo cáo các thay đổi trạng thái sau:</p>
   <ul>
-    <li>MCP连接状态变化（连接/断开）</li>
-    <li>工具数量变化（注册/注销）</li>
-    <li>健康状态变化</li>
-    <li>连接端点变化</li>
+    <li>Thay đổi trạng thái kết nối MCP (kết nối/ngắt kết nối)</li>
+    <li>Thay đổi số lượng công cụ (đăng ký/hủy đăng ký)</li>
+    <li>Thay đổi trạng thái sức khỏe</li>
+    <li>Thay đổi điểm cuối kết nối</li>
   </ul>
 
-  <h3>注意事项</h3>
+  <h3>Lưu ý quan trọng</h3>
   <ul>
-    <li>监控频率不宜过高，避免影响系统性能</li>
-    <li>仅变化模式可以减少不必要的输出</li>
-    <li>包含统计信息会增加输出数据量</li>
-    <li>手动模式下需要主动发送命令才会检查状态</li>
-    <li>状态历史有最大条目限制，超出会自动清理</li>
+    <li>Tần suất giám sát không nên quá cao để tránh ảnh hưởng đến hiệu suất hệ thống</li>
+    <li>Chế độ chỉ thay đổi có thể giảm đầu ra không cần thiết</li>
+    <li>Bao gồm thông tin thống kê sẽ tăng lượng dữ liệu đầu ra</li>
+    <li>Trong chế độ thủ công cần chủ động gửi lệnh mới kiểm tra trạng thái</li>
+    <li>Lịch sử trạng thái có giới hạn số mục tối đa, vượt quá sẽ tự động dọn dẹp</li>
   </ul>
 </script>
 

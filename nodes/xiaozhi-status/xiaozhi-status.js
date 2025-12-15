@@ -1,6 +1,6 @@
 /**
- * xiaozhi-status 状态监控节点
- * 用于监控MCP连接状态、工具状态和系统健康状况
+ * xiaozhi-status Nút giám sát trạng thái
+ * Dùng để giám sát trạng thái kết nối MCP, trạng thái công cụ và tình trạng sức khỏe hệ thống
  */
 
 module.exports = function(RED) {
@@ -9,7 +9,7 @@ module.exports = function(RED) {
   function XiaozhiStatusNode(config) {
     RED.nodes.createNode(this, config);
 
-    // 配置参数
+    // Tham số cấu hình
     this.name = config.name;
     this.xiaozhi = RED.nodes.getNode(config.xiaozhi);
     this.monitorMode = config.monitorMode || 'auto'; // auto, manual, scheduled
@@ -20,17 +20,17 @@ module.exports = function(RED) {
     this.includeTools = config.includeTools !== false;
     this.autoStart = config.autoStart !== false;
 
-    // 日志记录器
+    // Trình ghi nhật ký
     this.logger = new Logger(`Status[${this.name || this.id}]`);
 
-    // 状态监控
+    // Giám sát trạng thái
     this.monitoring = false;
     this.pollingTimer = null;
     this.lastStatus = null;
     this.statusHistory = [];
     this.maxHistorySize = 100;
 
-    // 统计信息
+    // Thông tin thống kê
     this.monitoringStats = {
       startedAt: null,
       totalOutputs: 0,
@@ -42,7 +42,7 @@ module.exports = function(RED) {
     const node = this;
 
     /**
-     * 获取当前状态信息
+     * Lấy thông tin trạng thái hiện tại
      */
     this.getCurrentStatus = function() {
       const timestamp = new Date().toISOString();
@@ -64,17 +64,17 @@ module.exports = function(RED) {
         status.mcp.endpoint = this.xiaozhi.endpoint;
         status.mcp.lastError = connectionState.lastError;
 
-        // 连接统计
+        // Thống kê kết nối
         if (this.includeStats && connectionState.stats) {
           status.mcp.stats = connectionState.stats;
         }
 
-        // MCP客户端统计
+        // Thống kê máy khách MCP
         if (this.includeStats && connectionState.mcpStats) {
           status.mcp.clientStats = connectionState.mcpStats;
         }
 
-        // 健康状态
+        // Trạng thái sức khỏe
         if (this.includeHealth) {
           try {
             status.mcp.health = this.xiaozhi.getHealth();
@@ -83,7 +83,7 @@ module.exports = function(RED) {
           }
         }
 
-        // 工具信息
+        // Thông tin công cụ
         if (this.includeTools && this.xiaozhi.mcpClient) {
           try {
             const tools = this.xiaozhi.mcpClient.getRegisteredTools();
@@ -104,7 +104,7 @@ module.exports = function(RED) {
         }
       }
 
-      // 系统信息
+      // Thông tin hệ thống
       status.system = {
         nodeId: this.id,
         nodeName: this.name,
@@ -121,14 +121,14 @@ module.exports = function(RED) {
     };
 
     /**
-     * 比较状态变化
+     * So sánh thay đổi trạng thái
      */
     this.compareStatus = function(current, previous) {
       if (!previous) return { hasChanges: true, changes: ['initial'] };
 
       const changes = [];
 
-      // MCP连接状态变化
+      // Thay đổi trạng thái kết nối MCP
       if (current.mcp.connected !== previous.mcp.connected) {
         changes.push(current.mcp.connected ? 'mcp_connected' : 'mcp_disconnected');
         this.monitoringStats.connectionChanges++;
@@ -138,13 +138,13 @@ module.exports = function(RED) {
         changes.push(`mcp_state_${current.mcp.connectionState}`);
       }
 
-      // 工具数量变化
+      // Thay đổi số lượng công cụ
       if (current.tools && previous.tools) {
         if (current.tools.count !== previous.tools.count) {
           changes.push('tools_count_changed');
         }
         
-        // 工具列表变化
+        // Thay đổi danh sách công cụ
         const currentTools = new Set(current.tools.names || []);
         const previousTools = new Set(previous.tools.names || []);
         
@@ -159,7 +159,7 @@ module.exports = function(RED) {
         }
       }
 
-      // 健康状态变化
+      // Thay đổi trạng thái sức khỏe
       if (current.mcp.health && previous.mcp.health) {
         if (current.mcp.health.status !== previous.mcp.health.status) {
           changes.push(`health_${current.mcp.health.status}`);
@@ -173,7 +173,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 处理状态输出
+     * Xử lý xuất trạng thái
      */
     this.outputStatus = function(current, comparison) {
       let outputPayload;
@@ -237,79 +237,79 @@ module.exports = function(RED) {
           this.monitoringStats.statusChanges++;
         }
 
-        this.logger.debug(`Status output: changes=${comparison.hasChanges}, mode=${this.outputMode}`);
+        this.logger.debug(`Xuất trạng thái: changes=${comparison.hasChanges}, mode=${this.outputMode}`);
       }
     };
 
     /**
-     * 执行状态检查
+     * Thực hiện kiểm tra trạng thái
      */
     this.checkStatus = function() {
       try {
         const current = this.getCurrentStatus();
         const comparison = this.compareStatus(current, this.lastStatus);
 
-        // 输出状态
+        // Xuất trạng thái
         this.outputStatus(current, comparison);
 
-        // 更新历史记录
+        // Cập nhật lịch sử
         this.statusHistory.push({
           timestamp: current.timestamp,
           status: current,
           changes: comparison.changes
         });
 
-        // 限制历史记录大小
+        // Giới hạn kích thước lịch sử
         if (this.statusHistory.length > this.maxHistorySize) {
           this.statusHistory.shift();
         }
 
-        // 更新最后状态
+        // Cập nhật trạng thái cuối cùng
         this.lastStatus = current;
 
-        // 更新节点状态显示
+        // Cập nhật hiển thị trạng thái nút
         this.updateNodeStatus(current);
 
       } catch (error) {
         this.monitoringStats.errors++;
-        this.logger.error('Status check failed:', error.message);
+        this.logger.error('Kiểm tra trạng thái thất bại:', error.message);
         this.updateNodeStatus(null, error);
       }
     };
 
     /**
-     * 开始监控
+     * Bắt đầu giám sát
      */
     this.startMonitoring = function() {
       if (this.monitoring) {
-        this.logger.debug('Monitoring already started');
+        this.logger.debug('Đã bắt đầu giám sát');
         return;
       }
 
       this.monitoring = true;
       this.monitoringStats.startedAt = new Date();
 
-      // 立即执行一次检查
+      // Thực hiện kiểm tra ngay lập tức
       this.checkStatus();
 
-      // 设置定时器
+      // Thiết lập bộ đếm thời gian
       if (this.monitorMode === 'auto' || this.monitorMode === 'scheduled') {
         this.pollingTimer = setInterval(() => {
           this.checkStatus();
         }, this.pollingInterval);
 
-        this.logger.info(`Monitoring started with ${this.pollingInterval}ms interval`);
+        this.logger.info(`Đã bắt đầu giám sát với khoảng thời gian ${this.pollingInterval}ms`);
       } else {
-        this.logger.info('Monitoring started in manual mode');
+        this.logger.info('Đã bắt đầu giám sát ở chế độ thủ công');
       }
     };
 
     /**
-     * 停止监控
+     * Dừng giám sát
      */
     this.stopMonitoring = function() {
       if (!this.monitoring) {
-        this.logger.debug('Monitoring already stopped');
+        this.logger.debug('Đã dừng giám sát');
         return;
       }
 
@@ -320,12 +320,12 @@ module.exports = function(RED) {
         this.pollingTimer = null;
       }
 
-      this.logger.info('Monitoring stopped');
+      this.logger.info('Đã dừng giám sát');
       this.updateNodeStatus(null, null, 'stopped');
     };
 
     /**
-     * 更新节点状态显示
+     * Cập nhật hiển thị trạng thái nút
      */
     this.updateNodeStatus = function(status, error, override) {
       if (override) {
@@ -334,12 +334,12 @@ module.exports = function(RED) {
       }
 
       if (error) {
-        this.status({ fill: 'red', shape: 'ring', text: `错误: ${error.message}` });
+        this.status({ fill: 'red', shape: 'ring', text: `Lỗi: ${error.message}` });
         return;
       }
 
       if (!status) {
-        this.status({ fill: 'grey', shape: 'ring', text: '未知状态' });
+        this.status({ fill: 'grey', shape: 'ring', text: 'Trạng thái không xác định' });
         return;
       }
 
@@ -348,28 +348,28 @@ module.exports = function(RED) {
       if (status.mcp.connected) {
         fill = 'green';
         shape = 'dot';
-        text = '已连接';
+        text = 'Đã kết nối';
       } else {
         fill = 'red';
         shape = 'ring';
-        text = '未连接';
+        text = 'Chưa kết nối';
       }
 
-      // 添加工具信息
+      // Thêm thông tin công cụ
       if (status.tools && status.tools.count > 0) {
-        text += ` (${status.tools.count}个工具)`;
+        text += ` (${status.tools.count} công cụ)`;
       }
 
-      // 添加监控状态
+      // Thêm trạng thái giám sát
       if (this.monitoring) {
-        text += ' [监控中]';
+        text += ' [Đang giám sát]';
       }
 
       this.status({ fill, shape, text });
     };
 
     /**
-     * 获取监控统计信息
+     * Lấy thông tin thống kê giám sát
      */
     this.getMonitoringStats = function() {
       return {
@@ -383,7 +383,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 获取状态历史
+     * Lấy lịch sử trạng thái
      */
     this.getStatusHistory = function(limit) {
       const history = this.statusHistory.slice();
@@ -393,7 +393,7 @@ module.exports = function(RED) {
       return history;
     };
 
-    // 处理输入消息
+    // Xử lý tin nhắn đầu vào
     this.on('input', function(msg) {
       const command = msg.payload;
 
@@ -426,64 +426,64 @@ module.exports = function(RED) {
           break;
         }
         default:
-          node.logger.warn('Unknown command:', command);
+          node.logger.warn('Lệnh không xác định:', command);
           break;
         }
       } else if (command && typeof command === 'object') {
-        // 处理对象命令
+        // Xử lý lệnh đối tượng
         if (command.action) {
           switch (command.action) {
           case 'configure':
             if (command.pollingInterval) {
               node.pollingInterval = parseInt(command.pollingInterval);
-              node.logger.info(`Polling interval updated to ${node.pollingInterval}ms`);
+              node.logger.info(`Đã cập nhật khoảng thời gian kiểm tra thành ${node.pollingInterval}ms`);
             }
             if (command.outputMode) {
               node.outputMode = command.outputMode;
-              node.logger.info(`Output mode updated to ${node.outputMode}`);
+              node.logger.info(`Đã cập nhật chế độ xuất thành ${node.outputMode}`);
             }
             break;
           default:
-            node.logger.warn('Unknown action:', command.action);
+            node.logger.warn('Hành động không xác định:', command.action);
             break;
           }
         }
       } else {
-        // 默认执行状态检查
+        // Mặc định thực hiện kiểm tra trạng thái
         node.checkStatus();
       }
     });
 
-    // 监听MCP连接状态变化
+    // Lắng nghe thay đổi trạng thái kết nối MCP
     if (this.xiaozhi) {
       const callbacks = {
         connected: () => {
-          this.logger.debug('MCP connected event received');
+          this.logger.debug('Đã nhận sự kiện kết nối MCP');
           if (this.monitoring) {
-            // 延迟检查，确保连接稳定
+            // Trì hoãn kiểm tra để đảm bảo kết nối ổn định
             setTimeout(() => this.checkStatus(), 1000);
           }
         },
         disconnected: (data) => {
-          this.logger.debug('MCP disconnected event received:', data.reason);
+          this.logger.debug('Đã nhận sự kiện ngắt kết nối MCP:', data.reason);
           if (this.monitoring) {
             this.checkStatus();
           }
         },
         error: (data) => {
-          this.logger.debug('MCP error event received:', data.error);
+          this.logger.debug('Đã nhận sự kiện lỗi MCP:', data.error);
           if (this.monitoring) {
             this.checkStatus();
           }
         },
         'tool-registered': (data) => {
-          this.logger.debug('Tool registered event received:', data.name);
+          this.logger.debug('Đã nhận sự kiện đăng ký công cụ:', data.name);
           if (this.monitoring) {
             setTimeout(() => this.checkStatus(), 500);
           }
         },
         'tool-unregistered': (data) => {
-          this.logger.debug('Tool unregistered event received:', data.name);
+          this.logger.debug('Đã nhận sự kiện hủy đăng ký công cụ:', data.name);
           if (this.monitoring) {
             setTimeout(() => this.checkStatus(), 500);
           }
@@ -493,23 +493,23 @@ module.exports = function(RED) {
       this.xiaozhi.registerDependentNode(this.id, callbacks);
     }
 
-    // 自动启动监控
+    // Tự động khởi động giám sát
     if (this.autoStart) {
       setTimeout(() => {
         this.startMonitoring();
       }, 1000);
     } else {
-      this.updateNodeStatus(null, null, '已停止');
+      this.updateNodeStatus(null, null, 'Đã dừng');
     }
 
-    // 节点关闭时清理
+    // Dọn dẹp khi đóng nút
     this.on('close', function(done) {
-      node.logger.info('Closing status monitoring node');
+      node.logger.info('Đang đóng nút giám sát trạng thái');
       
-      // 停止监控
+      // Dừng giám sát
       node.stopMonitoring();
       
-      // 从MCP配置节点注销
+      // Hủy đăng ký khỏi nút cấu hình MCP
       if (node.xiaozhi) {
         node.xiaozhi.unregisterDependentNode(node.id);
       }
@@ -518,14 +518,14 @@ module.exports = function(RED) {
     });
   }
 
-  // 注册节点类型
+  // Đăng ký loại nút
   RED.nodes.registerType('xiaozhi-status', XiaozhiStatusNode);
 
-  // 提供HTTP端点用于获取状态信息
+  // Cung cấp endpoint HTTP để lấy thông tin trạng thái
   RED.httpAdmin.get('/xiaozhi-status/:id/status', RED.auth.needsPermission('xiaozhi-status.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
@@ -537,22 +537,22 @@ module.exports = function(RED) {
     }
   });
 
-  // 提供HTTP端点用于获取监控统计
+  // Cung cấp endpoint HTTP để lấy thống kê giám sát
   RED.httpAdmin.get('/xiaozhi-status/:id/stats', RED.auth.needsPermission('xiaozhi-status.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
     res.json(node.getMonitoringStats());
   });
 
-  // 提供HTTP端点用于获取状态历史
+  // Cung cấp endpoint HTTP để lấy lịch sử trạng thái
   RED.httpAdmin.get('/xiaozhi-status/:id/history', RED.auth.needsPermission('xiaozhi-status.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
@@ -560,11 +560,11 @@ module.exports = function(RED) {
     res.json(node.getStatusHistory(limit));
   });
 
-  // 提供HTTP端点用于控制监控
+  // Cung cấp endpoint HTTP để điều khiển giám sát
   RED.httpAdmin.post('/xiaozhi-status/:id/control', RED.auth.needsPermission('xiaozhi-status.write'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút' });
       return;
     }
 
@@ -585,7 +585,7 @@ module.exports = function(RED) {
         res.json({ success: true, timestamp: new Date().toISOString() });
         break;
       default:
-        res.status(400).json({ error: 'Invalid action' });
+        res.status(400).json({ error: 'Hành động không hợp lệ' });
         break;
       }
     } catch (error) {

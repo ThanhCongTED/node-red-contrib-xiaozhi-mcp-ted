@@ -1,6 +1,6 @@
 /**
- * xiaozhi-config 配置节点
- * 管理与小智MCP服务器的连接配置
+ * Nút cấu hình xiaozhi-config
+ * Quản lý cấu hình kết nối với máy chủ MCP Xiaozhi
  */
 
 module.exports = function(RED) {
@@ -11,24 +11,24 @@ module.exports = function(RED) {
   function XiaozhiConfigNode(config) {
     RED.nodes.createNode(this, config);
 
-    // 配置参数
+    // Tham số cấu hình
     this.name = config.name;
     this.endpoint = config.endpoint;
-    this.serverName = config.serverName || 'NodeRED-Device';
+    this.serverName = config.serverName || 'Thiết bị NodeRED';
     this.autoReconnect = config.autoReconnect !== false;
     this.reconnectDelay = parseInt(config.reconnectDelay) || 5000;
     this.heartbeatInterval = parseInt(config.heartbeatInterval) || 30000;
     this.requestTimeout = parseInt(config.requestTimeout) || 30000;
 
-    // 日志记录器
+    // Trình ghi nhật ký
     this.logger = new Logger(`XiaozhiConfig[${this.name || this.id}]`);
 
-    // MCP客户端实例
+    // Phiên bản khách hàng MCP
     this.mcpClient = null;
     this.connectionState = 'disconnected';
     this.lastError = null;
 
-    // 连接统计信息
+    // Thông tin thống kê kết nối
     this.connectionStats = {
       connectedAt: null,
       disconnectedAt: null,
@@ -36,13 +36,13 @@ module.exports = function(RED) {
       totalUptime: 0
     };
 
-    // 依赖此配置的节点列表
+    // Danh sách các nút phụ thuộc vào cấu hình này
     this.dependentNodes = new Set();
 
     const node = this;
 
     /**
-     * 初始化MCP客户端
+     * Khởi tạo khách hàng MCP
      */
     this.initializeMCPClient = function() {
       if (this.mcpClient) {
@@ -50,12 +50,12 @@ module.exports = function(RED) {
       }
 
       try {
-        // 验证凭证
+        // Xác thực thông tin xác thực
         if (!this.credentials.token) {
-          throw new Error('Missing access token');
+          throw new Error('Thiếu mã truy cập');
         }
 
-        // 创建配置对象
+        // Tạo đối tượng cấu hình
         const mcpConfig = new MCPConfig({
           endpoint: this.endpoint,
           serverName: this.serverName,
@@ -65,47 +65,47 @@ module.exports = function(RED) {
           requestTimeout: this.requestTimeout
         });
 
-        // 创建凭证对象
+        // Tạo đối tượng thông tin xác thực
         const mcpCredentials = new MCPCredentials(this.credentials.token);
 
-        // 创建MCP客户端
+        // Tạo khách hàng MCP
         this.mcpClient = new WebSocketMCP(mcpConfig, mcpCredentials);
 
-        // 设置事件监听器
+        // Thiết lập trình lắng nghe sự kiện
         this.setupEventListeners();
 
-        this.logger.info('MCP client initialized');
+        this.logger.info('Đã khởi tạo khách hàng MCP');
         return true;
 
       } catch (error) {
         this.lastError = error.message;
-        this.logger.error('Failed to initialize MCP client:', error.message);
+        this.logger.error('Không thể khởi tạo khách hàng MCP:', error.message);
         this.updateStatus('error', error.message);
         return false;
       }
     };
 
     /**
-     * 设置事件监听器
+     * Thiết lập trình lắng nghe sự kiện
      */
     this.setupEventListeners = function() {
       if (!this.mcpClient) return;
 
-      // 连接成功
+      // Kết nối thành công
       this.mcpClient.on('connected', () => {
         this.connectionState = 'connected';
         this.connectionStats.connectedAt = new Date();
         this.connectionStats.connectionAttempts++;
         this.lastError = null;
 
-        this.logger.info('Connected to MCP server');
-        this.updateStatus('connected', '已连接');
+        this.logger.info('Đã kết nối đến máy chủ MCP');
+        this.updateStatus('connected', 'Đã kết nối');
         
-        // 通知依赖节点
+        // Thông báo cho các nút phụ thuộc
         this.notifyDependentNodes('connected');
       });
 
-      // 连接断开
+      // Kết nối bị ngắt
       this.mcpClient.on('disconnected', (data) => {
         this.connectionState = 'disconnected';
         this.connectionStats.disconnectedAt = new Date();
@@ -115,46 +115,46 @@ module.exports = function(RED) {
             Date.now() - this.connectionStats.connectedAt.getTime();
         }
 
-        this.logger.info('Disconnected from MCP server:', data.reason);
-        this.updateStatus('disconnected', '已断开');
+        this.logger.info('Đã ngắt kết nối khỏi máy chủ MCP:', data.reason);
+        this.updateStatus('disconnected', 'Đã ngắt kết nối');
         
-        // 通知依赖节点
+        // Thông báo cho các nút phụ thuộc
         this.notifyDependentNodes('disconnected', data);
       });
 
-      // 重连中
+      // Đang kết nối lại
       this.mcpClient.on('status-change', (data) => {
         if (data.state === 'reconnecting') {
           this.connectionState = 'reconnecting';
-          this.updateStatus('reconnecting', `重连中 (${data.attempt}/${data.maxAttempts})`);
+          this.updateStatus('reconnecting', `Đang kết nối lại (${data.attempt}/${data.maxAttempts})`);
         }
       });
 
-      // 连接错误
+      // Lỗi kết nối
       this.mcpClient.on('error', (error) => {
         this.lastError = error.message;
-        this.logger.error('MCP client error:', error.message);
+        this.logger.error('Lỗi khách hàng MCP:', error.message);
         this.updateStatus('error', error.message);
         
-        // 通知依赖节点
+        // Thông báo cho các nút phụ thuộc
         this.notifyDependentNodes('error', { error: error.message });
       });
 
-      // 工具注册事件
+      // Sự kiện đăng ký công cụ
       this.mcpClient.on('tool-registered', (data) => {
-        this.logger.debug(`Tool registered: ${data.name}`);
+        this.logger.debug(`Đã đăng ký công cụ: ${data.name}`);
         this.notifyDependentNodes('tool-registered', data);
       });
 
-      // 工具调用事件
+      // Sự kiện gọi công cụ
       this.mcpClient.on('tool-called', (data) => {
-        this.logger.debug(`Tool called: ${data.toolName}`);
+        this.logger.debug(`Đã gọi công cụ: ${data.toolName}`);
         this.notifyDependentNodes('tool-called', data);
       });
     };
 
     /**
-     * 连接到MCP服务器
+     * Kết nối đến máy chủ MCP
      */
     this.connect = async function() {
       if (!this.mcpClient) {
@@ -164,24 +164,24 @@ module.exports = function(RED) {
       }
 
       if (this.mcpClient.isConnected()) {
-        this.logger.debug('Already connected to MCP server');
+        this.logger.debug('Đã kết nối đến máy chủ MCP');
         return true;
       }
 
       try {
-        this.updateStatus('connecting', '连接中...');
+        this.updateStatus('connecting', 'Đang kết nối...');
         await this.mcpClient.connect();
         return true;
       } catch (error) {
         this.lastError = error.message;
-        this.logger.error('Failed to connect:', error.message);
+        this.logger.error('Không thể kết nối:', error.message);
         this.updateStatus('error', error.message);
         return false;
       }
     };
 
     /**
-     * 断开连接
+     * Ngắt kết nối
      */
     this.disconnect = function() {
       if (this.mcpClient) {
@@ -190,7 +190,7 @@ module.exports = function(RED) {
     };
 
     /**
-     * 更新节点状态显示
+     * Cập nhật hiển thị trạng thái nút
      */
     this.updateStatus = function(state, message) {
       const statusConfig = {
@@ -206,15 +206,15 @@ module.exports = function(RED) {
     };
 
     /**
-     * 注册依赖节点
+     * Đăng ký nút phụ thuộc
      */
     this.registerDependentNode = function(nodeId, callbacks) {
       this.dependentNodes.add({ nodeId, callbacks });
-      this.logger.debug(`Registered dependent node: ${nodeId}`);
+      this.logger.debug(`Đã đăng ký nút phụ thuộc: ${nodeId}`);
     };
 
     /**
-     * 注销依赖节点
+     * Hủy đăng ký nút phụ thuộc
      */
     this.unregisterDependentNode = function(nodeId) {
       this.dependentNodes.forEach(dep => {
@@ -222,11 +222,11 @@ module.exports = function(RED) {
           this.dependentNodes.delete(dep);
         }
       });
-      this.logger.debug(`Unregistered dependent node: ${nodeId}`);
+      this.logger.debug(`Đã hủy đăng ký nút phụ thuộc: ${nodeId}`);
     };
 
     /**
-     * 通知依赖节点
+     * Thông báo cho các nút phụ thuộc
      */
     this.notifyDependentNodes = function(event, data) {
       this.dependentNodes.forEach(dep => {
@@ -234,14 +234,14 @@ module.exports = function(RED) {
           try {
             dep.callbacks[event](data);
           } catch (error) {
-            this.logger.error(`Error notifying dependent node ${dep.nodeId}:`, error.message);
+            this.logger.error(`Lỗi khi thông báo cho nút phụ thuộc ${dep.nodeId}:`, error.message);
           }
         }
       });
     };
 
     /**
-     * 获取连接状态
+     * Lấy trạng thái kết nối
      */
     this.getConnectionState = function() {
       return {
@@ -254,62 +254,62 @@ module.exports = function(RED) {
     };
 
     /**
-     * 获取健康状态
+     * Lấy trạng thái sức khỏe
      */
     this.getHealth = function() {
       if (!this.mcpClient) {
-        return { status: 'unhealthy', reason: 'MCP client not initialized' };
+        return { status: 'unhealthy', reason: 'Chưa khởi tạo khách hàng MCP' };
       }
       return this.mcpClient.getHealth();
     };
 
-    // 节点初始化
+    // Khởi tạo nút
     if (this.credentials.token && this.endpoint) {
-      // 延迟初始化，确保Node-RED完全启动
+      // Trì hoãn khởi tạo, đảm bảo Node-RED khởi động hoàn toàn
       setTimeout(() => {
         if (this.initializeMCPClient()) {
           this.connect().catch(error => {
-            this.logger.error('Auto-connect failed:', error.message);
+            this.logger.error('Tự động kết nối thất bại:', error.message);
           });
         }
       }, 1000);
     } else {
-      this.updateStatus('error', '配置不完整');
+      this.updateStatus('error', 'Cấu hình không đầy đủ');
     }
 
-    // 节点关闭时清理
+    // Dọn dẹp khi đóng nút
     this.on('close', function(done) {
-      node.logger.info('Closing xiaozhi-config node');
+      node.logger.info('Đang đóng nút xiaozhi-config');
       
-      // 断开MCP连接
+      // Ngắt kết nối MCP
       if (node.mcpClient) {
         node.mcpClient.destroy();
         node.mcpClient = null;
       }
       
-      // 清理依赖节点
+      // Dọn dẹp các nút phụ thuộc
       node.dependentNodes.clear();
       
       done();
     });
   }
 
-  // 注册配置节点类型
+  // Đăng ký loại nút cấu hình
   RED.nodes.registerType('xiaozhi-config', XiaozhiConfigNode, {
     credentials: {
       token: { type: 'password' }
     }
   });
 
-  // 提供HTTP端点用于配置测试
+  // Cung cấp điểm cuối HTTP để kiểm tra cấu hình
   RED.httpAdmin.post('/xiaozhi-config/:id/test', RED.auth.needsPermission('xiaozhi-config.write'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Config node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút cấu hình' });
       return;
     }
 
-    // 测试连接
+    // Kiểm tra kết nối
     node.connect().then(success => {
       if (success) {
         const health = node.getHealth();
@@ -321,7 +321,7 @@ module.exports = function(RED) {
       } else {
         res.json({ 
           success: false, 
-          error: node.lastError || 'Connection failed' 
+          error: node.lastError || 'Kết nối thất bại' 
         });
       }
     }).catch(error => {
@@ -332,11 +332,11 @@ module.exports = function(RED) {
     });
   });
 
-  // 提供HTTP端点用于获取连接状态
+  // Cung cấp điểm cuối HTTP để lấy trạng thái kết nối
   RED.httpAdmin.get('/xiaozhi-config/:id/status', RED.auth.needsPermission('xiaozhi-config.read'), function(req, res) {
     const node = RED.nodes.getNode(req.params.id);
     if (!node) {
-      res.status(404).json({ error: 'Config node not found' });
+      res.status(404).json({ error: 'Không tìm thấy nút cấu hình' });
       return;
     }
 

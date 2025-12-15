@@ -1,159 +1,158 @@
-# Node-RED xiaozhi-mcp 扩展测试指南
+# Hướng dẫn kiểm tra mở rộng Node-RED xiaozhi-mcp
 
-## 🎯 测试目标
+## 🎯 Mục tiêu kiểm tra
 
-本测试指南将帮助您全面验证xiaozhi-mcp扩展的功能、性能和稳定性。测试分为四个阶段：
+Hướng dẫn kiểm tra này sẽ giúp bạn xác minh toàn diện chức năng, hiệu suất và độ ổn định của phần mở rộng xiaozhi-mcp. Kiểm tra được chia thành bốn giai đoạn:
 
-1. **单元测试** - 验证核心库功能
-2. **节点测试** - 验证Node-RED节点功能  
-3. **集成测试** - 验证端到端功能
-4. **生产环境测试** - 验证实际部署
+1. **Kiểm tra đơn vị** - Xác minh chức năng thư viện cốt lõi
+2. **Kiểm tra nút** - Xác minh chức năng nút Node-RED  
+3. **Kiểm tra tích hợp** - Xác minh chức năng end-to-end
+4. **Kiểm tra môi trường sản xuất** - Xác minh triển khai thực tế
 
-## 📋 测试前准备
+## 📋 Chuẩn bị trước khi kiểm tra
 
-### 环境要求
+### Yêu cầu môi trường
 
 - Node.js >= 14.0.0
 - Node-RED >= 2.0.0
-- 网络连接（用于连接小智MCP服务器）
+- Kết nối mạng (để kết nối với máy chủ MCP Xiaozhi)
 
-### 安装依赖
+### Cài đặt phụ thuộc
 
 ```bash
-# 进入项目目录
+# Vào thư mục dự án
 cd node-red-contrib-xiaozhi-mcp
 
-# 安装依赖
+# Cài đặt phụ thuộc
 npm install
 
-# 检查环境
+# Kiểm tra môi trường
 node --version
 npm --version
-```
 
-## 🧪 第一阶段：单元测试
 
-### 1.1 代码质量检查
+## 🧪 Giai đoạn 1: Kiểm tra đơn vị
+
+### 1.1 Kiểm tra chất lượng mã
 
 ```bash
-# 代码风格检查
+# Kiểm tra phong cách mã
 npm run lint
 
-# 自动修复格式问题
+# Tự động sửa lỗi định dạng
 npm run lint:fix
 
-# 代码格式化
+# Định dạng mã
 npm run format
 ```
 
-**期望结果：** 所有代码检查通过，无严重错误
 
-### 1.2 核心库测试
+
+### 1.2 Kiểm tra thư viện cốt lõi
 
 ```bash
-# 运行单元测试
+# Chạy kiểm tra đơn vị
 npm test
 
-# 运行测试并查看覆盖率
+# Chạy kiểm tra và xem độ phủ
 npm run test:coverage
 
-# 持续监控测试
+# Giám sát kiểm tra liên tục
 npm run test:watch
 ```
 
-**期望结果：**
-- ✅ 所有测试用例通过
-- ✅ 代码覆盖率 > 80%
-- ✅ 无内存泄漏
+**Kết quả mong đợi:**
+- ✅ Tất cả các trường hợp kiểm tra đều thông qua
+- ✅ Độ phủ mã > 80%
+- ✅ Không có rò rỉ bộ nhớ
 
-### 1.3 关键功能验证
+### 1.3 Xác minh chức năng chính
 
-测试核心功能点：
+Kiểm tra các điểm chức năng cốt lõi:
 
-**WebSocket连接测试：**
+**Kiểm tra kết nối WebSocket:**
 ```javascript
-// 验证连接配置
-✅ 配置对象创建
-✅ 端点格式验证
-✅ 凭证管理
-✅ 事件系统
+// Xác minh cấu hình kết nối
+✅ Tạo đối tượng cấu hình
+✅ Xác minh định dạng endpoint
+✅ Quản lý chứng chỉ
+✅ Hệ thống sự kiện
 
-// 验证连接管理
-✅ 连接建立
-✅ 连接状态监控
-✅ 自动重连机制
-✅ 心跳保活
+// Xác minh quản lý kết nối
+✅ Thiết lập kết nối
+✅ Giám sát trạng thái kết nối
+✅ Cơ chế tự động kết nối lại
+✅ Giữ nhịp tim
 ```
 
-**工具管理测试：**
+**Kiểm tra quản lý công cụ:**
 ```javascript
-// 验证工具操作
-✅ 工具注册
-✅ 工具注销
-✅ 参数验证
-✅ 工具执行
-✅ 错误处理
+// Xác minh thao tác công cụ
+✅ Đăng ký công cụ
+✅ Hủy đăng ký công cụ
+✅ Xác thực tham số
+✅ Thực thi công cụ
+✅ Xử lý lỗi
 ```
 
-**消息处理测试：**
+**Kiểm tra xử lý tin nhắn:**
 ```javascript
-// 验证消息系统
-✅ JSON-RPC消息验证
-✅ 消息ID生成
-✅ Ping/Pong处理
-✅ 错误消息处理
+// Xác minh hệ thống tin nhắn
+✅ Xác minh tin nhắn JSON-RPC
+✅ Tạo ID tin nhắn
+✅ Xử lý Ping/Pong
+✅ Xử lý tin nhắn lỗi
 ```
 
-## 🔧 第二阶段：Node-RED节点测试
+## 🔧 Giai đoạn 2: Kiểm tra nút Node-RED
 
-### 2.1 节点加载测试
+### 2.1 Kiểm tra tải nút
 
 ```bash
-# 在node-red-contrib-xiaozhi-mcp目录中运行
+# Chạy trong thư mục node-red-contrib-xiaozhi-mcp
 npm run test:nodes
 ```
 
-验证所有节点正确加载：
+Xác minh tất cả các nút được tải đúng cách:
 
-- ✅ xiaozhi-config 配置节点
-- ✅ xiaozhi-tool-register 工具注册节点
-- ✅ xiaozhi-tool-call 工具调用节点
-- ✅ xiaozhi-status 状态监控节点
-- ✅ xiaozhi-message 消息处理节点
+✅ Nút cấu hình xiaozhi-config
+✅ Nút đăng ký công cụ xiaozhi-tool-register
+✅ Nút gọi công cụ xiaozhi-tool-call
+✅ Nút giám sát trạng thái xiaozhi-status
+✅ Nút xử lý tin nhắn xiaozhi-message
+### 2.2 Kiểm tra cấu hình nút
 
-### 2.2 节点配置测试
-
-**xiaozhi-config 节点：**
+**Nút xiaozhi-config:**
 ```javascript
-测试点：
-✅ 必需配置验证
-✅ WebSocket端点格式
-✅ 连接凭证验证
-✅ 状态显示正确
+Điểm kiểm tra:
+✅ Xác minh cấu hình bắt buộc
+✅ Định dạng endpoint WebSocket
+✅ Xác thực chứng chỉ kết nối
+✅ Hiển thị trạng thái chính xác
 ```
 
-**工具注册节点：**
+**Nút đăng ký công cụ:**
 ```javascript
-测试点：
-✅ 工具名称验证
-✅ JSON Schema验证
-✅ 回调函数处理
-✅ 统计信息收集
+Điểm kiểm tra:
+✅ Xác minh tên công cụ
+✅ Xác thực JSON Schema
+✅ Xử lý hàm gọi lại
+✅ Thu thập thông tin thống kê
 ```
 
-### 2.3 节点通信测试
+### 2.3 Kiểm tra truyền thông giữa các nút
 
-验证节点间消息传递：
+Xác minh truyền thông điệp giữa các nút:
 
 ```javascript
-流程：注册节点 → 处理函数 → 响应返回
-✅ 消息格式正确
-✅ 调用ID匹配
-✅ 超时处理
-✅ 错误传播
+Quy trình: Nút đăng ký → Hàm xử lý → Phản hồi trả về
+✅ Định dạng tin nhắn chính xác
+✅ ID cuộc gọi khớp
+✅ Xử lý thời gian chờ
+✅ Truyền lỗi
 ```
 
-## 🌐 第三阶段：集成测试
+## 🌐 Kiểm tra tích hợp
 
 ### 3.1 安装到Node-RED
 
